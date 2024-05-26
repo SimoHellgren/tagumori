@@ -45,8 +45,6 @@ def add_tag(vault, filename, tags):
 
     vault_[filename] |= parse_tags(tags)
 
-    print(vault_)
-
     save_vault(vault, vault_)
 
 
