@@ -73,7 +73,6 @@ def remove_tag(vault, filename, tags):
     "tags",
     type=click.STRING,
     multiple=True,
-    required=True,
     help="Each instance of -t is considered an AND condition, which is then OR'd with others",
 )
 def ls(vault, tags):
@@ -82,7 +81,8 @@ def ls(vault, tags):
     tag_groups = [parse_tags(ts) for ts in tags]
 
     for file, tags_ in vault_.items():
-        if any(t.issubset(tags_) for t in tag_groups):
+        # one of the tag groups must be found, or no tags were provided
+        if any(t.issubset(tags_) for t in tag_groups) or not tag_groups:
             click.echo(file)
 
 
