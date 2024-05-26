@@ -31,6 +31,10 @@ def init_vault(vaultname):
         json.dump({}, f, indent=2)
 
 
+def parse_tags(tags):
+    return {tag.strip() for tag in tags.split(",")}
+
+
 @cli.command()
 @click.argument("vault", type=click.Path())
 @click.argument("filename", type=click.Path())
@@ -39,13 +43,23 @@ def add_tag(vault, filename, tags):
 
     vault_ = load_vault(vault)
 
-    tags_ = {tag.strip() for tag in tags.split(",")}
-
-    vault_[filename] |= tags_
+    vault_[filename] |= parse_tags(tags)
 
     print(vault_)
 
     save_vault(vault, vault_)
+
+
+@cli.command()
+@click.argument("vault", type=click.Path())
+@click.argument("tags", type=click.STRING)
+def ls(vault, tags):
+    vault_ = load_vault(vault)
+    criteria = parse_tags(tags)
+
+    for file, tags_ in vault_.items():
+        if criteria.issubset(tags_):
+            click.echo(file)
 
 
 if __name__ == "__main__":
