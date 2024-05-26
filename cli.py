@@ -1,6 +1,9 @@
 from collections import defaultdict
+from itertools import chain
 import json
 import click
+
+flatten = chain.from_iterable
 
 # a vault is a mapping of filenames to tags
 Vault = defaultdict[str, set[str]]
@@ -66,6 +69,17 @@ def ls(vault, tags):
     for file, tags_ in vault_.items():
         if any(t.issubset(tags_) for t in tag_groups):
             click.echo(file)
+
+
+@cli.command()
+@click.argument("vault", type=click.Path())
+def list_tags(vault):
+    vault_ = load_vault(vault)
+
+    all_tags = set(flatten(vault_.values()))
+
+    for tag in sorted(all_tags):
+        click.echo(tag)
 
 
 if __name__ == "__main__":
