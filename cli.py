@@ -42,11 +42,16 @@ def parse_tags(tags):
 @click.option("--vault", type=click.Path(), default="./vault.json")
 @click.option("-t", "tags", type=click.STRING)
 @click.option("-f", "filename", type=click.Path(exists=True), multiple=True)
-def add_tag(vault, filename, tags):
+@click.option("-r", "read", type=click.File("r"), help="Read file or stdin (-r -)")
+def add_tag(vault, filename, tags, read):
 
     vault_ = load_vault(vault)
 
-    for fn in filename:
+    filenames = filename or []
+    if read:
+        filenames.extend(read.read().strip().split("\n"))
+
+    for fn in filenames:
         vault_[fn] |= parse_tags(tags)
 
     save_vault(vault, vault_)
