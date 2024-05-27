@@ -42,6 +42,9 @@ def init_vault(vaultname):
 
 
 def parse_tags(tags):
+    if not tags:
+        return set()
+
     return {tag.strip() for tag in tags.split(",")}
 
 
