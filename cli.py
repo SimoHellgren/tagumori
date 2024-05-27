@@ -1,5 +1,6 @@
 from collections import defaultdict
 from itertools import chain
+from pathlib import Path
 import json
 import click
 
@@ -30,8 +31,14 @@ def cli():
 @cli.command()
 @click.argument("vaultname")
 def init_vault(vaultname):
-    with open(vaultname, "w") as f:
-        json.dump({}, f, indent=2)
+    path = Path(vaultname)
+
+    if path.exists():
+        click.echo(f"{vaultname} already exists.")
+
+    else:
+        with open(path, "w") as f:
+            json.dump({}, f, indent=2)
 
 
 def parse_tags(tags):
