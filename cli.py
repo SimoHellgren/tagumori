@@ -20,7 +20,7 @@ class Vault:
         return [
             file
             for file, f_tags in self.data.items()
-            if any(t.issubset(f_tags) for t in tags) or not tags
+            if any(t.issubset(f_tags) for t in tags or []) or not tags
         ]
 
     def tags(self) -> List[str]:
