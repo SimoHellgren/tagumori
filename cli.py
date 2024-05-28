@@ -15,6 +15,9 @@ class Vault:
             converted_sets = {k: set(v) for k, v in json.load(f).items()}
             self.data = defaultdict(set, converted_sets)
 
+    def tags(self):
+        return sorted(set(flatten(self.values())))
+
     def __getitem__(self, key):
         return self.data[key]
 
@@ -120,10 +123,7 @@ def ls(vault, tags):
 @cli.command()
 @click.pass_obj
 def list_tags(vault):
-
-    all_tags = set(flatten(vault.values()))
-
-    for tag in sorted(all_tags):
+    for tag in vault.tags():
         click.echo(tag)
 
 
