@@ -15,6 +15,17 @@ class Vault:
             converted_sets = {k: set(v) for k, v in json.load(f).items()}
             self.data = defaultdict(set, converted_sets)
 
+    def files(self, tags=None):
+        """Lists files, by filtering by tags.
+
+        Type of tags is list[set].
+        """
+        return [
+            file
+            for file, f_tags in self.data.items()
+            if any(t.issubset(f_tags) for t in tags) or not tags
+        ]
+
     def tags(self):
         return sorted(set(flatten(self.values())))
 
@@ -114,10 +125,8 @@ def remove_tag(vault, filename, tags):
 def ls(vault, tags):
     tag_groups = [parse_tags(ts) for ts in tags]
 
-    for file, tags_ in vault.items():
-        # one of the tag groups must be found, or no tags were provided
-        if any(t.issubset(tags_) for t in tag_groups) or not tag_groups:
-            click.echo(file)
+    for file in vault.files(tag_groups):
+        click.echo(file)
 
 
 @cli.command()
