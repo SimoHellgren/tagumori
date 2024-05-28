@@ -57,8 +57,10 @@ class Vault:
 
 
 @click.group()
-def cli():
-    pass
+@click.option("--vault", type=click.Path(), default="./vault.json")
+@click.pass_context
+def cli(ctx, vault):
+    ctx.obj = ctx.with_resource(Vault(vault))
 
 
 @cli.command()
@@ -75,7 +77,7 @@ def parse_tags(tags):
 
 
 @cli.command()
-@click.option("--vault", type=click.Path(), default="./vault.json")
+@click.pass_obj
 @click.option("-t", "tags", type=click.STRING)
 @click.option("-f", "filename", type=click.Path(exists=True), multiple=True)
 @click.option("-r", "read", type=click.File("r"), help="Read file or stdin (-r -)")
@@ -84,24 +86,21 @@ def add_tag(vault, filename, tags, read):
     if read:
         filenames.extend(read.read().strip().split("\n"))
 
-    with Vault(vault) as vault_:
-        for fn in filenames:
-            vault_[fn] |= parse_tags(tags)
+    for fn in filenames:
+        vault[fn] |= parse_tags(tags)
 
 
 @cli.command()
-@click.option("--vault", type=click.Path(), default="./vault.json")
+@click.pass_obj
 @click.option("-t", "tags", type=click.STRING)
 @click.option("-f", "filename", type=click.Path(exists=True), multiple=True)
 def remove_tag(vault, filename, tags):
-
-    with Vault(vault) as vault_:
-        for fn in filename:
-            vault_[fn] -= parse_tags(tags)
+    for fn in filename:
+        vault[fn] -= parse_tags(tags)
 
 
 @cli.command()
-@click.option("--vault", type=click.Path(), default="./vault.json")
+@click.pass_obj
 @click.option(
     "-t",
     "tags",
@@ -110,22 +109,19 @@ def remove_tag(vault, filename, tags):
     help="Each instance of -t is considered an AND condition, which is then OR'd with others",
 )
 def ls(vault, tags):
-    vault_ = Vault(vault)
-
     tag_groups = [parse_tags(ts) for ts in tags]
 
-    for file, tags_ in vault_.items():
+    for file, tags_ in vault.items():
         # one of the tag groups must be found, or no tags were provided
         if any(t.issubset(tags_) for t in tag_groups) or not tag_groups:
             click.echo(file)
 
 
 @cli.command()
-@click.option("--vault", type=click.Path(), default="./vault.json")
+@click.pass_obj
 def list_tags(vault):
-    vault_ = Vault(vault)
 
-    all_tags = set(flatten(vault_.values()))
+    all_tags = set(flatten(vault.values()))
 
     for tag in sorted(all_tags):
         click.echo(tag)
