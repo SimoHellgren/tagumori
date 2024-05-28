@@ -6,21 +6,54 @@ import click
 
 flatten = chain.from_iterable
 
-# a vault is a mapping of filenames to tags
-# Vault = defaultdict[str, set[str]]
 
+class Vault:
+    def __init__(self, filename):
+        self.filename = filename
 
-def load_vault(filename):
-    with open(filename, "r") as f:
-        converted_sets = {k: set(v) for k, v in json.load(f).items()}
-        return defaultdict(set, converted_sets)
+        with open(filename, "r") as f:
+            converted_sets = {k: set(v) for k, v in json.load(f).items()}
+            self.data = defaultdict(set, converted_sets)
 
+    def __getitem__(self, key):
+        return self.data[key]
 
-def save_vault(filename, data):
-    with open(filename, "w") as f:
-        # default handles conversion of sets to lists.
-        # possibly need to do something more elegant later.
-        json.dump(data, f, indent=2, default=list)
+    def __setitem__(self, key, value):
+        self.data[key] = value
+
+    def __delitem__(self, key):
+        del self.data[key]
+
+    def key(self):
+        return self.data.keys()
+
+    def values(self):
+        return self.data.values()
+
+    def items(self):
+        return self.data.items()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, trace):
+        # only write if no exception
+        if exc_type is None:
+            with open(self.filename, "w") as f:
+                # default handles conversion of sets to lists.
+                # possibly need to do something more elegant later.
+                json.dump(self.data, f, indent=2, default=list)
+
+    @staticmethod
+    def init(name):
+        path = Path(name)
+
+        if path.exists():
+            click.echo(f"{name} already exists.")
+
+        else:
+            with open(path, "w") as f:
+                json.dump({}, f, indent=2)
 
 
 @click.group()
@@ -31,14 +64,7 @@ def cli():
 @cli.command()
 @click.argument("vaultname")
 def init_vault(vaultname):
-    path = Path(vaultname)
-
-    if path.exists():
-        click.echo(f"{vaultname} already exists.")
-
-    else:
-        with open(path, "w") as f:
-            json.dump({}, f, indent=2)
+    Vault.init(vaultname)
 
 
 def parse_tags(tags):
@@ -54,17 +80,13 @@ def parse_tags(tags):
 @click.option("-f", "filename", type=click.Path(exists=True), multiple=True)
 @click.option("-r", "read", type=click.File("r"), help="Read file or stdin (-r -)")
 def add_tag(vault, filename, tags, read):
-
-    vault_ = load_vault(vault)
-
     filenames = filename or []
     if read:
         filenames.extend(read.read().strip().split("\n"))
 
-    for fn in filenames:
-        vault_[fn] |= parse_tags(tags)
-
-    save_vault(vault, vault_)
+    with Vault(vault) as vault_:
+        for fn in filenames:
+            vault_[fn] |= parse_tags(tags)
 
 
 @cli.command()
@@ -73,12 +95,9 @@ def add_tag(vault, filename, tags, read):
 @click.option("-f", "filename", type=click.Path(exists=True), multiple=True)
 def remove_tag(vault, filename, tags):
 
-    vault_ = load_vault(vault)
-
-    for fn in filename:
-        vault_[fn] -= parse_tags(tags)
-
-    save_vault(vault, vault_)
+    with Vault(vault) as vault_:
+        for fn in filename:
+            vault_[fn] -= parse_tags(tags)
 
 
 @cli.command()
@@ -91,7 +110,7 @@ def remove_tag(vault, filename, tags):
     help="Each instance of -t is considered an AND condition, which is then OR'd with others",
 )
 def ls(vault, tags):
-    vault_ = load_vault(vault)
+    vault_ = Vault(vault)
 
     tag_groups = [parse_tags(ts) for ts in tags]
 
@@ -104,7 +123,7 @@ def ls(vault, tags):
 @cli.command()
 @click.option("--vault", type=click.Path(), default="./vault.json")
 def list_tags(vault):
-    vault_ = load_vault(vault)
+    vault_ = Vault(vault)
 
     all_tags = set(flatten(vault_.values()))
 
