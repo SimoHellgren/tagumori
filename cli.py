@@ -26,10 +26,8 @@ class Vault:
     def tags(self) -> List[str]:
         return sorted(set(flatten(self.data.values())))
 
-    def pairs(self):
-        for file, tags in self.data.items():
-            for tag in tags:
-                yield file, tag
+    def items(self):
+        return self.data.items()
 
     def add_tags(self, file: str, tags: Set[str]):
         self.data[file] |= tags
