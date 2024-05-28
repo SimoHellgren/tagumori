@@ -29,14 +29,11 @@ class Vault:
     def tags(self):
         return sorted(set(flatten(self.data.values())))
 
-    def __getitem__(self, key):
-        return self.data[key]
+    def add_tags(self, file, tags):
+        self.data[file] |= tags
 
-    def __setitem__(self, key, value):
-        self.data[key] = value
-
-    def __delitem__(self, key):
-        del self.data[key]
+    def remove_tags(self, file, tags):
+        self.data[file] -= tags
 
     def __enter__(self):
         return self
@@ -86,22 +83,22 @@ def parse_tags(tags):
 @click.option("-t", "tags", type=click.STRING)
 @click.option("-f", "filename", type=click.Path(exists=True), multiple=True)
 @click.option("-r", "read", type=click.File("r"), help="Read file or stdin (-r -)")
-def add_tag(vault, filename, tags, read):
+def add_tag(vault: Vault, filename, tags, read):
     filenames = filename or []
     if read:
         filenames.extend(read.read().strip().split("\n"))
 
     for fn in filenames:
-        vault[fn] |= parse_tags(tags)
+        vault.add_tags(fn, parse_tags(tags))
 
 
 @cli.command()
 @click.pass_obj
 @click.option("-t", "tags", type=click.STRING)
 @click.option("-f", "filename", type=click.Path(exists=True), multiple=True)
-def remove_tag(vault, filename, tags):
+def remove_tag(vault: Vault, filename, tags):
     for fn in filename:
-        vault[fn] -= parse_tags(tags)
+        vault.remove_tags(fn, parse_tags(tags))
 
 
 @cli.command()
