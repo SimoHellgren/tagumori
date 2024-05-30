@@ -62,5 +62,18 @@ def list_tags(vault: Vault):
         click.echo(tag)
 
 
+@cli.group()
+@click.pass_obj
+def tag(vault):
+    pass
+
+
+@tag.command()
+@click.option("-t", "tag", type=click.STRING, required=True)
+@click.pass_obj
+def create(vault: Vault, tag: str):
+    vault.create_tag(tag)
+
+
 if __name__ == "__main__":
     cli()

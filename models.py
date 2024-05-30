@@ -33,10 +33,23 @@ class Vault:
         return self.entries.items()
 
     def add_tags(self, file: str, tags: Set[str]):
+        current_tags = set(self.tags)
+        new_tags = tags - current_tags
+
+        for tag in new_tags:
+            self.create_tag(tag)
+
         self.entries[file] |= tags
 
     def remove_tags(self, file: str, tags: Set[str]):
         self.entries[file] -= tags
+
+    def create_tag(self, tag):
+        if tag in self.tags:
+            print(tag, "already exists")
+
+        else:
+            self.tags.append(tag)
 
     def __enter__(self):
         return self
