@@ -3,7 +3,7 @@ from collections import defaultdict
 from pathlib import Path
 import json
 import click
-from utils import flatten
+from utils import flatten, find
 
 
 class Tag:
@@ -13,7 +13,7 @@ class Tag:
 
     def to_dict(self):
         # bit of an ugly hack that ensures that this converts to JSON properly.
-        return {self.name: list(self.tag_along)}
+        return {"name": self.name, "tag_along": list(self.tag_along)}
 
     def __str__(self):
         return self.name
@@ -36,7 +36,7 @@ class Vault:
 
             data = json.load(f)
 
-            self.tags = {Tag(*tag) for tag in data["tags"]}
+            self.tags = {Tag(tag["name"], tag["tag_along"]) for tag in data["tags"]}
 
             converted_sets = {k: set(v) for k, v in data["entries"].items()}
             self.entries = defaultdict(set, converted_sets)
@@ -54,14 +54,23 @@ class Vault:
     def items(self):
         return self.entries.items()
 
+    def get_tag(self, tag: str) -> Optional[Tag]:
+        return find(lambda x: x.name == tag, self.tags)
+
     def add_tags(self, file: str, tags: Set[str]):
+        # create new tags if needed
         current_tags = set(t.name for t in self.tags)
         new_tags = tags - current_tags
 
         for tag in new_tags:
             self.create_tag(tag)
 
-        self.entries[file] |= tags
+        # for each tag, find tagalongs
+        for tag in tags:
+            tag_obj = self.get_tag(tag)
+            with_tagalongs = self.get_tagalongs(tag_obj)
+
+            self.entries[file] |= with_tagalongs
 
     def remove_tags(self, file: str, tags: Set[str]):
         self.entries[file] -= tags
@@ -76,6 +85,25 @@ class Vault:
 
             else:
                 self.tags.add(tag_obj)
+
+    def get_tagalongs(self, tag: Tag, seen: set = None):
+        """Recursively find all tag-alongs for a tag"""
+        # keep track of already seen tags to avoid infinite loops
+        if not seen:
+            seen = set()
+
+        seen.add(tag.name)
+
+        result = set([tag.name, *tag.tag_along])
+        for ta in tag.tag_along:
+            if ta in seen:
+                continue
+
+            ta_obj = self.get_tag(ta)
+            next_tas = self.get_tagalongs(ta_obj, seen)
+            result |= next_tas
+
+        return result
 
     def __enter__(self):
         return self
