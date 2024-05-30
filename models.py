@@ -45,14 +45,16 @@ class Vault:
         # only write if no exception
         if exc_type is None:
             with open(self.filename, "w") as f:
-                # default handles conversion of sets to lists.
-                # possibly need to do something more elegant later.
-                json.dump(
-                    {"entries": self.entries, "tags": self.tags},
-                    f,
-                    indent=2,
-                    default=list,
-                )
+                f.write(self.to_json(indent=2))
+
+    def to_json(self, **kwargs):
+        return json.dumps(
+            {
+                "entries": {name: list(tags) for name, tags in self.entries.items()},
+                "tags": self.tags,
+            },
+            **kwargs,
+        )
 
     @staticmethod
     def init(name):
