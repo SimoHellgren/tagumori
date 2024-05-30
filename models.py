@@ -12,7 +12,8 @@ class Tag:
         self.tag_along = tag_along or []
 
     def to_dict(self):
-        return {self.name: self.tag_along}
+        # bit of an ugly hack that ensures that this converts to JSON properly.
+        return {self.name: list(self.tag_along)}
 
     def __str__(self):
         return self.name
@@ -54,7 +55,7 @@ class Vault:
         return self.entries.items()
 
     def add_tags(self, file: str, tags: Set[str]):
-        current_tags = set(self.tags)
+        current_tags = set(t.name for t in self.tags)
         new_tags = tags - current_tags
 
         for tag in new_tags:
@@ -65,12 +66,16 @@ class Vault:
     def remove_tags(self, file: str, tags: Set[str]):
         self.entries[file] -= tags
 
-    def create_tag(self, tag):
-        if tag in {t.name for t in self.tags}:
-            print(tag, "already exists")
+    def create_tag(self, tag: str, tag_along: list = None):
+        # generate tag objects for tag and tag_alongs
+        objects = {Tag(tag, tag_along)} | {Tag(ta) for ta in tag_along or []}
 
-        else:
-            self.tags.add(Tag(tag, []))
+        for tag_obj in objects:
+            if tag_obj in self.tags:
+                print(tag_obj, "already exists")
+
+            else:
+                self.tags.add(tag_obj)
 
     def __enter__(self):
         return self
@@ -82,11 +87,13 @@ class Vault:
                 f.write(self.to_json(indent=2))
 
     def to_json(self, **kwargs):
+        t = {
+            "entries": {name: list(tags) for name, tags in self.entries.items()},
+            "tags": [tag.to_dict() for tag in self.tags],
+        }
+
         return json.dumps(
-            {
-                "entries": {name: list(tags) for name, tags in self.entries.items()},
-                "tags": [tag.to_dict() for tag in self.tags],
-            },
+            t,
             **kwargs,
         )
 
