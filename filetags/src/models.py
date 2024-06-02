@@ -3,7 +3,7 @@ from collections import defaultdict
 from pathlib import Path
 import json
 import click
-from utils import flatten, find
+from filetags.src.utils import flatten, find
 
 
 class Tag:

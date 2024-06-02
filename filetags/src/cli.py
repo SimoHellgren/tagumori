@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Set, List
 import click
 
-from models import Vault, DelimitedSet
+from filetags.src.models import Vault, DelimitedSet
 
 
 @click.group()
