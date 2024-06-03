@@ -5,9 +5,9 @@ def test_basic_tag():
     t = Tag("test")
 
     assert t.name == "test"
-    assert t.tag_along == []
+    assert t.tag_along == set()
 
-    assert t.__json__() == {"name": "test", "tag_along": []}
+    assert t.__json__() == {"name": "test", "tag_along": set()}
 
 
 def test_tag_with_tagalongs():

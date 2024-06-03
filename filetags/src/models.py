@@ -21,7 +21,7 @@ class VaultJSONEncoder(json.JSONEncoder):
 class Tag:
     def __init__(self, name, tag_along=None):
         self.name = name
-        self.tag_along = tag_along or []
+        self.tag_along = tag_along or set()
 
     def __json__(self):
         """Returns a json-serializable version of self"""
@@ -47,7 +47,7 @@ class Vault:
 
     @classmethod
     def from_json(cls, data):
-        tags = {Tag(tag["name"], tag["tag_along"]) for tag in data["tags"]}
+        tags = {Tag(tag["name"], set(tag["tag_along"])) for tag in data["tags"]}
 
         converted_sets = {k: set(v) for k, v in data["entries"].items()}
         entries = defaultdict(set, converted_sets)
@@ -97,6 +97,15 @@ class Vault:
 
             else:
                 self.tags.add(tag_obj)
+
+    def add_tagalongs(self, tag: str, tag_alongs: set):
+        tag_obj = self.get_tag(tag)
+
+        for ta in tag_alongs:
+            if not self.get_tag(ta):
+                self.tags.add(Tag(ta))
+
+        tag_obj.tag_along |= tag_alongs
 
     def get_tagalongs(self, tag: Tag, seen: set = None) -> Set[str]:
         """Recursively find all tag-alongs for a tag"""

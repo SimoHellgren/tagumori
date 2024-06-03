@@ -40,3 +40,28 @@ def test_circular_tagalongs(vault: Vault):
     tagalongs = vault.get_tagalongs(x)
 
     assert {"x", "xx", "xxx"} == tagalongs
+
+
+def test_add_tagalongs(vault: Vault):
+    y = vault.get_tag("y")
+    big_y = vault.get_tag("Y")
+
+    assert y
+    assert not big_y  # should not exist yet
+
+    assert not y.tag_along  # should be empty
+
+    vault.add_tagalongs("y", {"Y"})
+
+    big_y = vault.get_tag("Y")
+    assert big_y  # should be created now
+    assert y.tag_along == {"Y"}
+
+
+def test_add_tagalongs_preserves_existing(vault: Vault):
+    x = vault.get_tag("x")
+    current = set(x.tag_along)
+
+    vault.add_tagalongs("x", {"y", "yy"})
+
+    assert current.issubset(x.tag_along)
