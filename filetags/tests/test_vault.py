@@ -102,3 +102,7 @@ def test_delete_tag(vault: Vault):
     # tag shuold not be any other tag's tagalong
     for tag in vault.tags:
         assert "x" not in tag.tag_along
+
+    # other tags should still be present
+    assert vault.get_tag("y")
+    assert vault.files([{"y"}])
