@@ -83,17 +83,17 @@ def ls(vault: Vault, select: List[Set[str]], exclude: List[Set[str]]):
         click.echo(file)
 
 
-@cli.command()
-@click.pass_obj
-def list_tags(vault: Vault):
-    for tag in vault.tags:
-        click.echo(tag)
-
-
 @cli.group()
 @click.pass_obj
 def tag(vault):
     pass
+
+
+@tag.command(name="ls")
+@click.pass_obj
+def list_tags(vault: Vault):
+    for tag in sorted(vault.tags, key=lambda x: x.name):
+        click.echo(tag)
 
 
 @tag.command()
