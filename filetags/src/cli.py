@@ -106,6 +106,13 @@ def create(vault: Vault, tag: str, tag_along):
 
 @tag.command()
 @click.option("-t", "tag", type=click.STRING, required=True)
+@click.pass_obj
+def delete(vault: Vault, tag: str):
+    vault.delete_tag(tag)
+
+
+@tag.command()
+@click.option("-t", "tag", type=click.STRING, required=True)
 @click.option("--tag-along", type=DelimitedSet())
 @click.pass_obj
 def add_tag_along(vault: Vault, tag: str, tag_along: Set[str]):
