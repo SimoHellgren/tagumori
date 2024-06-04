@@ -66,12 +66,6 @@ class Vault:
             and not any(t.issubset(f_tags) for t in exclude or [])
         }
 
-    def list_tags(self) -> List[str]:
-        return sorted(set(flatten(self.entries.values())))
-
-    def items(self):
-        return self.entries.items()
-
     def get_tag(self, tag: str) -> Optional[Tag]:
         return find(lambda x: x.name == tag, self.tags)
 
