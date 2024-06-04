@@ -53,11 +53,18 @@ class Vault:
         entries = defaultdict(set, converted_sets)
         return cls(entries, tags)
 
-    def files(self, tags: Optional[List[Set[str]]] = None) -> List[str]:
+    def files(
+        self,
+        select: Optional[List[Set[str]]] = None,
+        exclude: Optional[List[Set[str]]] = None,
+    ) -> List[str]:
+
         return [
             file
             for file, f_tags in self.entries.items()
-            if any(t.issubset(f_tags) for t in tags or []) or not tags
+            if any(t.issubset(f_tags) for t in select or [])
+            or not select
+            and not any(t.issubset(f_tags) for t in exclude or [])
         ]
 
     def list_tags(self) -> List[str]:

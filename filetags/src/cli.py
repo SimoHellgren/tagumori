@@ -65,14 +65,21 @@ def remove_tag(vault: Vault, filename: List[Path], tags: Set[str]):
 @cli.command()
 @click.pass_obj
 @click.option(
-    "-t",
-    "tags",
+    "-s",
+    "select",
     type=DelimitedSet(),
     multiple=True,
-    help="Each instance of -t is considered an AND condition, which is then OR'd with others",
+    help="Each instance of `select` is considered an AND condition, which is then OR'd with others",
 )
-def ls(vault: Vault, tags: List[Set[str]]):
-    for file in vault.files(tags):
+@click.option(
+    "-e",
+    "exclude",
+    type=DelimitedSet(),
+    multiple=True,
+    help="Each instance of `exclude` is considered an AND condition, which is then OR'd with others",
+)
+def ls(vault: Vault, select: List[Set[str]], exclude: List[Set[str]]):
+    for file in vault.files(select, exclude):
         click.echo(file)
 
 
