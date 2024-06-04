@@ -104,6 +104,19 @@ class Vault:
             else:
                 self.tags.add(tag_obj)
 
+    def delete_tag(self, tag: str):
+        # remove tag from all files
+        for file in self.entries:
+            self.remove_tags(file, {tag})
+
+        # remove tag from tagalongs
+        for t in self.tags:
+            t.tag_along -= {tag}
+
+        # remove tag itself
+        tag_obj = self.get_tag(tag)
+        self.tags -= {tag_obj}
+
     def add_tagalongs(self, tag: str, tag_alongs: set):
         tag_obj = self.get_tag(tag)
 

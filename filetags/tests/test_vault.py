@@ -88,3 +88,17 @@ def test_files_filters(vault: Vault):
 
     # both select and exclude
     assert vault.files(select=[{"a"}], exclude=[{"x"}]) == ["demo1"]
+
+
+def test_delete_tag(vault: Vault):
+    vault.delete_tag("x")
+
+    # tag should no longer exist
+    assert not vault.get_tag("x")
+
+    # no files should be tagged with tag
+    assert not vault.files(select=[{"x"}])
+
+    # tag shuold not be any other tag's tagalong
+    for tag in vault.tags:
+        assert "x" not in tag.tag_along
