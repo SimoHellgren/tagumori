@@ -66,6 +66,9 @@ class Vault:
             and not any(t.issubset(f_tags) for t in exclude or [])
         }
 
+    def get_file(self, filename: str) -> Optional[str]:
+        return self.entries.get(filename)
+
     def get_tag(self, tag: str) -> Optional[Tag]:
         return find(lambda x: x.name == tag, self.tags)
 

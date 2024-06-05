@@ -39,6 +39,17 @@ def cli(ctx, vault: Path):
         Path(f.name).unlink()
 
 
+@cli.command(help="Show a file and its tags")
+@click.pass_obj
+@click.argument("filename", type=click.Path(exists=True))
+def show(vault: Vault, filename: str):
+    res = vault.get_file(filename)
+    if res:
+        click.echo(f"{filename}: [{', '.join(res)}]")
+    else:
+        click.echo(f"Couldn't find {filename}")
+
+
 @cli.command(help="Add tags to files")
 @click.pass_obj
 @click.option("-t", "tags", type=DelimitedSet())
@@ -91,6 +102,18 @@ def ls(vault: Vault, select: List[Set[str]], exclude: List[Set[str]], tags: bool
 @click.pass_obj
 def tag(vault):
     pass
+
+
+@tag.command(help="Show tag information", name="show")
+@click.pass_obj
+@click.argument("tagname")
+def show_tag(vault: Vault, tagname: str):
+    t = vault.get_tag(tagname)
+    if not t:
+        click.echo(f"Couldn't find tag {tagname}")
+
+    else:
+        click.echo(t.__json__())
 
 
 @tag.command(name="ls")
