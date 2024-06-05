@@ -120,6 +120,11 @@ class Vault:
 
         tag_obj.tag_along |= tag_alongs
 
+    def remove_tagalongs(self, tag: str, tag_alongs: set):
+        tag_obj = self.get_tag(tag)
+
+        tag_obj.tag_along -= tag_alongs
+
     def get_tagalongs(self, tag: Tag, seen: set = None) -> Set[str]:
         """Recursively find all tag-alongs for a tag"""
         # keep track of already seen tags to avoid infinite loops

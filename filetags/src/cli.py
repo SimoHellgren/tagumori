@@ -123,5 +123,13 @@ def add_tag_along(vault: Vault, tag: str, tag_along: Set[str]):
     vault.add_tagalongs(tag, tag_along)
 
 
+@tag.command()
+@click.option("-t", "tag", type=click.STRING, required=True)
+@click.option("--tag-along", type=DelimitedSet())
+@click.pass_obj
+def remove_tag_along(vault: Vault, tag: str, tag_along: Set[str]):
+    vault.remove_tagalongs(tag, tag_along)
+
+
 if __name__ == "__main__":
     cli()
