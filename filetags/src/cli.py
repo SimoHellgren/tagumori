@@ -94,8 +94,8 @@ def remove_tag(vault: Vault, filename: List[Path], tags: Set[str]):
 )
 def ls(vault: Vault, select: List[Set[str]], exclude: List[Set[str]], tags: bool):
     for file, f_tags in vault.files(select, exclude).items():
-        msg = file + (f"\t[{', '.join(f_tags)}]" if tags else "")
-        click.echo(msg)
+        tag_string = f"\t[{', '.join(f_tags)}]" if tags else ""
+        click.echo(click.style(file, fg="green") + click.style(tag_string, fg="cyan"))
 
 
 @cli.group(help="Subcommands for tag management")
