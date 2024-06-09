@@ -22,6 +22,14 @@ class Vault:
     def remove_entry(self, name: str):
         self._entries = [file for file in self._entries if file.name != name]
 
+    def add_tags(self, filename: str, tags: list[Tag]):
+        # constructing "Tag(filename)" twice is kinda silly
+        (entry,) = self.find(Tag(filename))
+
+        entry.merge(Tag(filename, tags))
+
+        return entry
+
 
 def parse(tag: dict):
     name = tag["name"]
@@ -36,4 +44,5 @@ if __name__ == "__main__":
 
     vault = Vault([parse(e) for e in data])
 
-    vault.entries()
+    for file, tags in vault.entries():
+        print(file, tags)
