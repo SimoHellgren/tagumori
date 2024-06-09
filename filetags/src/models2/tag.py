@@ -19,6 +19,7 @@ class Tag:
         return {"name": self.name, "children": self.children}
 
     def find(self, tag: Self) -> Optional[Self]:
+        """Depth-first search"""
         # None matches any tag
         if tag.name == self.name or tag.name is None:
             return self
@@ -41,3 +42,14 @@ class Tag:
 
         # all children must match
         return all(node.find(child) for child in tag.children)
+
+    def paths(self):
+        """Returns all paths from self to leaves
+        e.g. path A[a,b[c]] -> [[A,a], [A,b,c]]
+        """
+
+        if not self.children:
+            yield Tag(self.name)
+
+        for child in self.children:
+            yield Tag(self.name, list(child.paths()))
