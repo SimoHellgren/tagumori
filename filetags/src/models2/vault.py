@@ -2,6 +2,10 @@ from typing import Generator
 import json
 from filetags.src.models2.node import Node
 
+# TODO: consider implementing Vault as just a Node with a root value
+# this would likely need the implementation of a wilcard search to enable
+# skipping levels
+
 
 class Vault:
     def __init__(self, entries: Node):
@@ -10,6 +14,11 @@ class Vault:
     def entries(self) -> Generator[tuple[str, list[Node]], None, None]:
         for file in self._entries:
             yield file, file.children
+
+    def find(self, path: list[str]):
+        for file, children in self.entries():
+            if any(c.get_path(path) for c in children):
+                yield file, children
 
 
 def parse(tag: dict):

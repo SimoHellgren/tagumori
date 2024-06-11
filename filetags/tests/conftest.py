@@ -2,6 +2,8 @@ import json
 import pytest
 from filetags.src.models import Vault
 
+# TODO: new test data for new models
+
 test_data = {
     "entries": {
         "demo1": ["a"],
