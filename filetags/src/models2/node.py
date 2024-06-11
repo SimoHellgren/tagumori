@@ -1,4 +1,4 @@
-from typing import Self, TypeVar, Generic, Optional, Generator
+from typing import Self, TypeVar, Generic, Optional, Generator, Callable, Iterable
 
 T = TypeVar("T")
 
@@ -35,6 +35,12 @@ class Node(Generic[T]):
 
     def path(self) -> tuple[Self]:
         return tuple(reversed(list(self.iter_path_reverse())))
+
+    def find_all(self, pred: Callable[[Self], bool]) -> Iterable[Self]:
+        return filter(pred, self.preorder())
+
+    def find(self, pred: Callable[[Self], bool]) -> Optional[Self]:
+        return next(self.find_all(pred), None)
 
     def get_path(self, path: list[T]) -> Self:
         """Starting from self, traverse path and return node if found.

@@ -223,3 +223,44 @@ def test_from_path():
 
     assert node.value == 1
     assert [n.value for n in node.preorder()] == [1, 2, 3]
+
+
+def test_find_all():
+    tree = n1 = Node(1)
+    n2 = Node(2, parent=n1)
+    n3 = Node(3, parent=n2)  # leaf
+    n4 = Node(4, parent=n2)  # leaf
+    n5 = Node(5, parent=n1)  # leaf
+    n6 = Node(6, parent=n1)
+    n7 = Node(7, parent=n6)
+    n8 = Node(8, parent=n7)  # leaf
+
+    result = list(tree.find_all(lambda x: x.value > 5))
+
+    assert n1 not in result
+    assert n2 not in result
+    assert n3 not in result
+    assert n4 not in result
+    assert n5 not in result
+    assert n6 in result
+    assert n7 in result
+    assert n8 in result
+
+    assert list(tree.find_all(lambda x: x.value < 0)) == []
+
+
+def test_find():
+    tree = n1 = Node(1)
+    n2 = Node(2, parent=n1)
+    n3 = Node(3, parent=n2)  # leaf
+    n4 = Node(4, parent=n2)  # leaf
+    n5 = Node(5, parent=n1)  # leaf
+    n6 = Node(6, parent=n1)
+    n7 = Node(7, parent=n6)
+    n8 = Node(8, parent=n7)  # leaf
+
+    result = tree.find(lambda x: x.value > 5)
+
+    assert n6 == result
+
+    assert tree.find(lambda x: x.value < 0) is None
