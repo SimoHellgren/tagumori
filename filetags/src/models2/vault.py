@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Generator, Self
 import json
 from filetags.src.models2.node import Node
 
@@ -20,10 +20,14 @@ class Vault:
             if any(c.get_path(path) for c in children):
                 yield file, children
 
+    @classmethod
+    def from_json(cls, data: list) -> Self:
+        return cls(parse(e) for e in data)
 
-def parse(tag: dict):
-    name = tag["name"]
-    children = tag["children"]
+
+def parse(entry: dict):
+    name = entry["name"]
+    children = entry["children"]
     child_tags = [parse(t) for t in children]
     return Node(name, child_tags)
 
@@ -32,7 +36,7 @@ if __name__ == "__main__":
     with open("vault2.json") as f:
         data = json.load(f)
 
-    vault = Vault([parse(e) for e in data])
+    vault = Vault.from_json(data)
 
-    for file, tags in vault.entries():
+    for file, tags in vault.find(["p1"]):
         print(file.value, list(map(str, tags)))

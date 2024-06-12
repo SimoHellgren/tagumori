@@ -1,27 +1,33 @@
-import json
 import pytest
-from filetags.src.models import Vault
+from filetags.src.models2.vault import Vault
 
-# TODO: new test data for new models
 
-test_data = {
-    "entries": {
-        "demo1": ["a"],
-        "demo2": ["y"],
-        "demo3": ["a", "xxx", "x", "xx"],
-        "demo4": [],
+test_data = [
+    {
+        "name": "file1",
+        "children": [
+            {
+                "name": "A",
+                "children": [
+                    {"name": "a", "children": []},
+                    {"name": "b", "children": []},
+                ],
+            },
+            {"name": "B", "children": [{"name": "a", "children": []}]},
+        ],
     },
-    "tags": [
-        {"name": "a", "tag_along": []},
-        {"name": "A", "tag_along": ["a"]},
-        {"name": "y", "tag_along": []},
-        # circular tag-alongs
-        # also useful for recursive tag-along tests
-        {"name": "x", "tag_along": ["xxx"]},
-        {"name": "xx", "tag_along": ["x"]},
-        {"name": "xxx", "tag_along": ["xx"]},
-    ],
-}
+    {
+        "name": "file2",
+        "children": [
+            {
+                "name": "B",
+                "children": [
+                    {"name": "b", "children": []},
+                ],
+            }
+        ],
+    },
+]
 
 
 @pytest.fixture
