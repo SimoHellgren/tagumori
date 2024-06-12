@@ -13,7 +13,6 @@ def test_entries(vault: Vault):
 
 
 def test_find(vault: Vault):
-    # TODO: fix this test
     # get nodes for setup
     file1, file2 = sorted(vault._entries, key=lambda x: x.value)
 
@@ -32,3 +31,7 @@ def test_find(vault: Vault):
 
     assert file1 not in files
     assert file2 in files
+
+    result = list(vault.find(["XXX"]))
+
+    assert not result
