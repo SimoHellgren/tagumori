@@ -133,29 +133,15 @@ def test_preorder():
     assert [n.value for n in tree.preorder()] == [1, 2, 3, 4, 5, 6, 7, 8]
 
 
-def test_root():
-    tree = Node(
-        1,
-        children=[
-            Node(2, children=[Node(3), Node(4)]),
-            Node(5),
-            Node(6, children=[Node(7, children=[Node(8)])]),
-        ],
-    )
+def test_root(nodes: list[Node]):
+    tree = nodes[0]
 
     for node in tree.preorder():
         assert node.root is tree
 
 
-def test_leaves():
-    n1 = Node(1)
-    n2 = Node(2, parent=n1)
-    n3 = Node(3, parent=n2)  # leaf
-    n4 = Node(4, parent=n2)  # leaf
-    n5 = Node(5, parent=n1)  # leaf
-    n6 = Node(6, parent=n1)
-    n7 = Node(7, parent=n6)
-    n8 = Node(8, parent=n7)  # leaf
+def test_leaves(nodes: list[Node]):
+    [n1, n2, n3, n4, n5, n6, n7, n8] = nodes
 
     leaves = list(n1.leaves())
 
@@ -169,16 +155,8 @@ def test_leaves():
     assert n8 in leaves
 
 
-def test_get_path():
-    n1 = Node(1)
-    n2 = Node(2, parent=n1)
-    n3 = Node(3, parent=n2)  # leaf
-    n4 = Node(4, parent=n2)  # leaf
-    n5 = Node(5, parent=n1)  # leaf
-    n6 = Node(6, parent=n1)
-    n7 = Node(7, parent=n6)
-    n8 = Node(8, parent=n7)  # leaf
-
+def test_get_path(nodes: list[Node]):
+    [n1, n2, n3, n4, n5, n6, n7, n8] = nodes
     tree = n1
 
     # happy paths
@@ -198,17 +176,8 @@ def test_get_path():
     assert tree.get_path([8]) is None
 
 
-def test_get_path_remainder():
-    n1 = Node(1)
-    n2 = Node(2, parent=n1)
-    n3 = Node(3, parent=n2)  # leaf
-    n4 = Node(4, parent=n2)  # leaf
-    n5 = Node(5, parent=n1)  # leaf
-    n6 = Node(6, parent=n1)
-    n7 = Node(7, parent=n6)
-    n8 = Node(8, parent=n7)  # leaf
-
-    tree = n1
+def test_get_path_remainder(nodes: list[Node]):
+    tree = n1 = nodes[0]
 
     assert tree.get_path_remainder([1]) == (n1, [])
     assert tree.get_path_remainder([1, 3]) == (n1, [3])
@@ -225,15 +194,9 @@ def test_from_path():
     assert [n.value for n in node.preorder()] == [1, 2, 3]
 
 
-def test_find_all():
-    tree = n1 = Node(1)
-    n2 = Node(2, parent=n1)
-    n3 = Node(3, parent=n2)  # leaf
-    n4 = Node(4, parent=n2)  # leaf
-    n5 = Node(5, parent=n1)  # leaf
-    n6 = Node(6, parent=n1)
-    n7 = Node(7, parent=n6)
-    n8 = Node(8, parent=n7)  # leaf
+def test_find_all(nodes: list[Node]):
+    [n1, n2, n3, n4, n5, n6, n7, n8] = nodes
+    tree = n1
 
     result = list(tree.find_all(lambda x: x.value > 5))
 
@@ -249,15 +212,9 @@ def test_find_all():
     assert list(tree.find_all(lambda x: x.value < 0)) == []
 
 
-def test_find():
-    tree = n1 = Node(1)
-    n2 = Node(2, parent=n1)
-    n3 = Node(3, parent=n2)  # leaf
-    n4 = Node(4, parent=n2)  # leaf
-    n5 = Node(5, parent=n1)  # leaf
-    n6 = Node(6, parent=n1)
-    n7 = Node(7, parent=n6)
-    n8 = Node(8, parent=n7)  # leaf
+def test_find(nodes: list[Node]):
+    tree = nodes[0]
+    n6 = nodes[5]
 
     result = tree.find(lambda x: x.value > 5)
 
