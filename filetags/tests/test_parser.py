@@ -1,6 +1,12 @@
 from filetags.src.parser import parse
 
 
+def test_empty():
+    result = parse("")
+
+    assert result
+
+
 def test_basic():
     result = parse("a")
 

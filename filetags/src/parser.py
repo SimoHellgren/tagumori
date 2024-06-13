@@ -4,7 +4,7 @@ from filetags.src.models.node import Node
 # grammar for parsing expressions like A[a,b],B[b] into nodes
 #
 GRAMMAR = """
-root: list
+root: list |
 
 tag: NAME [ list ]
 list: "[" [ tag ("," tag)*  ] "]" | tag ("," tag)* 
@@ -25,7 +25,11 @@ class Transformer(lark.Transformer):
         self.rootvalue = rootvalue
 
     def root(self, t):
-        (children,) = t
+        if not t:
+            children = []
+        else:
+            (children,) = t
+
         return Node(self.rootvalue, children)
 
     def tag(self, s):
