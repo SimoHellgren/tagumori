@@ -31,9 +31,9 @@ def test_vault(vault: Vault):
     assert len(result) == 2
 
 
-def test_vault2(vault: Vault):
+def test_vault_to_json(vault: Vault):
     """Converts vault to json and back, and checks that the result is the same"""
-    json_string = json.dumps(vault, cls=VaultJSONEncoder)
+    json_string = vault.to_json()
 
     vault2 = Vault.from_json(json.loads(json_string))
 

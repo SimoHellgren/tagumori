@@ -88,6 +88,9 @@ class Vault:
     def __json__(self):
         return self._entries
 
+    def to_json(self, **kwargs):
+        return json.dumps(self, cls=VaultJSONEncoder, **kwargs)
+
 
 class VaultJSONEncoder(json.JSONEncoder):
     def default(self, obj):
