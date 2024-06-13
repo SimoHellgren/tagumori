@@ -1,4 +1,4 @@
-from typing import Generator, Self, Optional
+from typing import Generator, Self, Optional, Callable
 import json
 from filetags.src.models.node import Node
 
@@ -17,17 +17,19 @@ class Vault:
         for file in self._entries:
             yield file, file.children
 
-    def find(
+    def find(self, pred: Callable) -> Node | None:
+        return next(filter(pred, self._entries), None)
+
+    def filter(
         self, include: Optional[list[str]] = None, exclude: Optional[list[str]] = None
     ):
-        # TODO: consider renaming this to e.g. `filter` - `find` could be useful otherwise
         for file, children in self.entries():
             # skip if exclude
             if exclude and next(file.find_path(exclude), None):
                 continue
 
             # yield if include
-            if not include or next(file.find_path(include), None):
+            if not include or next(file.find_path(include), False):
                 yield file, children
 
     def add_entry(self, entry: Node):

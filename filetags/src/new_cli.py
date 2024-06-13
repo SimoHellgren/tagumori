@@ -40,8 +40,24 @@ def cli(ctx, vault: Path):
 @click.option("-t", "tag", is_flag=True)
 @click.pass_obj
 def ls(vault: Vault, tag: bool):
-    for file, tags in vault.find():
+    for file, tags in vault.filter():
         tagstring = f"\t[{','.join(str(t) for t in tags)}]" if tag else ""
         click.echo(
             click.style(f"{file.value}", fg="green") + click.style(tagstring, fg="blue")
         )
+
+
+@cli.command()
+@click.pass_obj
+@click.argument("filename", nargs=-1)
+def show(vault: Vault, filename: str):
+
+    for f in filename:
+        file = vault.find(lambda x: x.value == f)
+
+        if file:
+            tagstring = f"\t[{','.join(str(t) for t in file.children)}]"
+            click.echo(
+                click.style(f"{file.value}", fg="green")
+                + click.style(tagstring, fg="blue")
+            )

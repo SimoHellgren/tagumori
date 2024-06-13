@@ -14,36 +14,41 @@ def test_entries(vault: Vault):
 
 
 def test_find(vault: Vault):
+    assert vault.find(lambda x: x.value == "file1")
+    assert not vault.find(lambda x: x.value == "file999")
+
+
+def test_filter(vault: Vault):
     # get nodes for setup
     file1, file2 = sorted(vault._entries, key=lambda x: x.value)
 
     # transpose to get a nice list of files
-    (files, _) = zip(*vault.find(["A"]))
+    (files, _) = zip(*vault.filter(["A"]))
 
     assert file1 in files
     assert file2 not in files
 
-    (files, _) = zip(*vault.find(["b"]))
+    (files, _) = zip(*vault.filter(["b"]))
 
     assert file1 in files
     assert file2 in files
 
-    (files, _) = zip(*vault.find(["B", "b"]))
+    (files, _) = zip(*vault.filter(["B", "b"]))
 
     assert file1 not in files
     assert file2 in files
 
-    result = list(vault.find(["XXX"]))
+    result = list(vault.filter(["XXX"]))
 
     assert not result
 
     # test(s) for excluding
-    (files, _) = zip(*vault.find(include=["b"], exclude=["B", "b"]))
+    (files, _) = zip(*vault.filter(include=["b"], exclude=["B", "b"]))
     assert file1 in files
     assert file2 not in files
 
     # empty `include` should include all files
-    find_result = vault.find(None)
+    find_result = vault.filter(None)
     entries = vault.entries()
     assert list(find_result) == list(entries)
 
@@ -75,7 +80,7 @@ def test_add_new_entry(vault: Vault):
     assert "file2" in filenames
     assert "file3" in filenames
 
-    assert list(vault.find(["random new tag"]))
+    assert list(vault.filter(["random new tag"]))
 
 
 def test_add_existing_entry(vault: Vault):
@@ -84,7 +89,7 @@ def test_add_existing_entry(vault: Vault):
     vault.add_entry(entry)  # should not do anything
 
     assert entry not in vault._entries
-    assert not list(vault.find(["other new tag"]))
+    assert not list(vault.filter(["other new tag"]))
 
 
 def test_remove_entry(vault: Vault):
