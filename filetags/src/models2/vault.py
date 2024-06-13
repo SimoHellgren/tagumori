@@ -18,6 +18,7 @@ class Vault:
     def find(
         self, include: Optional[list[str]] = None, exclude: Optional[list[str]] = None
     ):
+        # TODO: consider renaming this to e.g. `filter` - `find` could be useful otherwise
         for file, children in self.entries():
             # skip if exclude
             if exclude and next(file.find_path(exclude), None):
@@ -26,6 +27,15 @@ class Vault:
             # yield if include
             if include and next(file.find_path(include), None):
                 yield file, children
+
+    def add_entry(self, entry: Node):
+        if not entry.value in [e.value for e in self._entries]:
+            self._entries.append(entry)
+
+    def remove_entry(self, name: str) -> Node | None:
+        entry = next((e for e in self._entries if e.value == name), None)
+        self._entries = [e for e in self._entries if e is not entry]
+        return entry
 
     def rename_tag(self, tag: str, new: str):
         """Renames all instances of tag"""
