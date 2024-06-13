@@ -1,6 +1,7 @@
 from typing import Generator, Self, Optional, Callable
 import json
 from filetags.src.models.node import Node
+from filetags.src.utils import flatten
 
 # TODO: consider implementing Vault as just a Node with a root value
 # this would likely need the implementation of a wilcard search to enable
@@ -83,6 +84,11 @@ class Vault:
             for node in nodes:
                 node.value = new
 
+    def tags(self) -> set[Node]:
+        return set(
+            flatten((x.value for x in file.descendants()) for file in self._entries)
+        )
+
     @classmethod
     def from_json(cls, data: list) -> Self:
         return cls([parse(e) for e in data])
@@ -110,10 +116,12 @@ def parse(entry: dict):
 
 
 if __name__ == "__main__":
-    with open("vault2.json") as f:
+    with open("vault.json") as f:
         data = json.load(f)
 
     vault = Vault.from_json(data)
 
     for file, tags in vault.entries():
         print(file.value, list(map(str, tags)))
+
+    print(vault.tags())

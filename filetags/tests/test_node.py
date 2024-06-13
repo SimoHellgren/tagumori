@@ -120,17 +120,23 @@ def test_detach():
     assert n2.parent is None
 
 
-def test_preorder():
-    tree = Node(
-        1,
-        children=[
-            Node(2, children=[Node(3), Node(4)]),
-            Node(5),
-            Node(6, children=[Node(7, children=[Node(8)])]),
-        ],
-    )
+def test_preorder(nodes: list[Node]):
+    tree = nodes[0]
 
     assert [n.value for n in tree.preorder()] == [1, 2, 3, 4, 5, 6, 7, 8]
+
+
+def test_descendants(nodes: list[Node]):
+    [n1, n2, n3, n4, n5, n6, n7, n8] = nodes
+
+    assert [n.value for n in n1.descendants()] == [2, 3, 4, 5, 6, 7, 8]
+    assert [n.value for n in n2.descendants()] == [3, 4]
+    assert [n.value for n in n3.descendants()] == []
+    assert [n.value for n in n4.descendants()] == []
+    assert [n.value for n in n5.descendants()] == []
+    assert [n.value for n in n6.descendants()] == [7, 8]
+    assert [n.value for n in n7.descendants()] == [8]
+    assert [n.value for n in n8.descendants()] == []
 
 
 def test_root(nodes: list[Node]):

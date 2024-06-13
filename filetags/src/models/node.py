@@ -1,4 +1,5 @@
 from typing import Self, TypeVar, Generic, Optional, Generator, Callable, Iterator
+from filetags.src.utils import tail
 
 T = TypeVar("T")
 
@@ -124,6 +125,9 @@ class Node(Generic[T]):
             return tuple()
 
         return self.parent.path()
+
+    def descendants(self) -> tuple[Self, ...]:
+        return tuple(tail(self.preorder()))
 
     def preorder(self) -> Generator[Self, None, None]:
         """Iterate over the tree with preorder DFS"""

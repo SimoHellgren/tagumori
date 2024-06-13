@@ -61,3 +61,16 @@ def show(vault: Vault, filename: str):
                 click.style(f"{file.value}", fg="green")
                 + click.style(tagstring, fg="blue")
             )
+
+
+@cli.group()
+@click.pass_obj
+def tag(vault: Vault):
+    pass
+
+
+@tag.command(name="ls")
+@click.pass_obj
+def list_tags(vault: Vault):
+    for tag in sorted(vault.tags()):
+        click.echo(tag)
