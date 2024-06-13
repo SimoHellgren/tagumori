@@ -9,7 +9,7 @@ from filetags.src.models2.node import Node
 
 class Vault:
     def __init__(self, entries: list[Node]):
-        self._entries = entries
+        self._entries: list[Node] = entries
 
     def entries(self) -> Generator[tuple[Node, list[Node]], None, None]:
         for file in self._entries:
@@ -36,6 +36,29 @@ class Vault:
         entry = next((e for e in self._entries if e.value == name), None)
         self._entries = [e for e in self._entries if e is not entry]
         return entry
+
+    def add_tag(self, tag: Node):
+        """Node should start at the file-level"""
+
+        # find the file of interest
+        file = next((f for f in self._entries if f.value == tag.value), None)
+
+        if not file:
+            return
+
+        # find a place for each path of tag
+        for path in tag.paths_down():
+            # TODO: this is a bit wonky - there are two notions of `path` in Node:
+            # 1. path is of type list[T]
+            # 2. path is of type tuple[Node]
+            path_strings = [e.value for e in path]
+            node, remainder = file.get_path_remainder(path_strings)
+
+            # if no remainder, the tag already exists
+            if node and remainder:
+                # also a bit silly that we construct a completely new Node here,
+                # when we already provide one as an input.
+                node.add_child(Node.from_path(remainder))
 
     def rename_tag(self, tag: str, new: str):
         """Renames all instances of tag"""

@@ -98,3 +98,53 @@ def test_remove_non_existent(vault: Vault):
     assert not entry2
     assert file1 in vault._entries
     assert file2 in vault._entries
+
+
+def test_add_tag(vault: Vault):
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    # new top-level tag
+    tag = Node("file1", [Node("C", [Node("c")])])
+
+    vault.add_tag(tag)
+
+    assert [c.value for c in file1.children] == ["A", "B", "C"]
+
+
+def test_add_nested_tag(vault: Vault):
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    # new top-level tag
+    tag = Node("file1", [Node("A", [Node("c")])])
+
+    vault.add_tag(tag)
+    a, b = file1.children
+
+    assert [c.value for c in file1.children] == ["A", "B"]
+    assert "c" in [c.value for c in a.children]
+
+
+def test_add_nested_tag(vault: Vault):
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    # new nested tag
+    tag = Node("file1", [Node("A", [Node("c")])])
+
+    vault.add_tag(tag)
+    a, b = file1.children
+
+    assert [c.value for c in file1.children] == ["A", "B"]
+    assert "c" in [c.value for c in a.children]
+
+
+def test_add_existing_tag(vault: Vault):
+    before, _ = sorted(vault._entries, key=lambda x: x.value)
+
+    # new top-level tag
+    tag = Node("file1", [Node("A", [Node("b")])])
+
+    vault.add_tag(tag)
+
+    after, _ = sorted(vault._entries, key=lambda x: x.value)
+
+    assert list(before.preorder()) == list(after.preorder())
