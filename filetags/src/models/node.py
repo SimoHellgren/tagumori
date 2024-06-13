@@ -16,7 +16,7 @@ class Node(Generic[T]):
         if parent:
             parent.add_child(self)
 
-        self.children: list = children or []
+        self.children: list[Self] = children or []
         for child in self.children:
             child.parent = self
 
