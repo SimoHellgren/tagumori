@@ -20,7 +20,7 @@ class Node(Generic[T]):
             child.parent = self
 
     def iter_path_reverse(self) -> Generator[Self, None, None]:
-        node = self
+        node: Self | None = self
         while node is not None:
             yield node
             node = node.parent
