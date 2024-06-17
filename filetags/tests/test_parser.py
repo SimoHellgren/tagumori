@@ -67,3 +67,21 @@ def test_deeply_nested():
 
     values = [n.value for n in result.descendants()]
     assert values == list("abcde")
+
+
+def test_escaped_string():
+    result = parse('"escaped string"')
+
+    (esc,) = result.children
+    assert esc.value == "escaped string"
+
+
+def test_nested_escaped_string():
+    result = parse('"escaped string"[subtag,"escaped subtag"]')
+
+    (esc,) = result.children
+    subtag, esc_subtag = esc.children
+
+    assert esc.value == "escaped string"
+    assert subtag.value == "subtag"
+    assert esc_subtag.value == "escaped subtag"

@@ -2,14 +2,14 @@ import lark
 from filetags.src.models.node import Node
 
 # grammar for parsing expressions like A[a,b],B[b] into nodes
-#
 GRAMMAR = """
 root: list |
 
-tag: NAME [ list ]
+tag: name [ list ]
 list: "[" [ tag ("," tag)*  ] "]" | tag ("," tag)* 
 
-NAME: WORD | STRING
+?name: WORD | string
+string: STRING
 WORD: (LETTER | DIGIT | "_" | "-")+
 
 %import common.LETTER
@@ -35,6 +35,12 @@ class Transformer(lark.Transformer):
     def tag(self, s):
         value, children = s
         return Node(value, children)
+
+    def string(self, s):
+        """Strip quotes from quoted string"""
+        (s,) = s
+        print("handling", s)
+        return s[1:-1]
 
     list = list
     NAME = lambda s, n: n.value
