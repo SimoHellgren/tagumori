@@ -17,6 +17,14 @@ def test_basic():
     assert child.value == "a"
 
 
+def test_basic_brackets():
+    result = parse("[a]")
+
+    (child,) = result.children
+
+    assert child.value == "a"
+
+
 def test_multiple():
     result = parse("a,b")
 
