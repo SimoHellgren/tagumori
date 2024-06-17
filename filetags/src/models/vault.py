@@ -11,8 +11,9 @@ from filetags.src.utils import flatten
 
 
 class Vault:
-    def __init__(self, entries: list[Node]):
+    def __init__(self, entries: list[Node], tagalongs: list):
         self._entries: list[Node] = entries
+        self.tagalongs = tagalongs
 
     def entries(self) -> Generator[tuple[Node, list[Node]], None, None]:
         for file in self._entries:
@@ -80,10 +81,10 @@ class Vault:
 
     @classmethod
     def from_json(cls, data: list) -> Self:
-        return cls([parse(e) for e in data])
+        return cls([parse(e) for e in data["entries"]], data["tagalongs"])
 
     def __json__(self):
-        return self._entries
+        return {"entries": self._entries, "tagalongs": self.tagalongs}
 
     def to_json(self, **kwargs):
         return json.dumps(self, cls=VaultJSONEncoder, **kwargs)

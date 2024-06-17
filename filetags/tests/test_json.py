@@ -27,7 +27,7 @@ def test_node(nodes: list[Node]):
 def test_vault(vault: Vault):
     result = vault.__json__()
     assert result
-    assert isinstance(result, list)
+    assert isinstance(result, dict)
     assert len(result) == 2
 
 
@@ -44,10 +44,10 @@ def test_vault_to_json(vault: Vault):
 
 
 def test_empty_vault():
-    vault = Vault([])
+    vault = Vault([], [])
 
     assert vault
-    assert vault.__json__() == []
+    assert vault.__json__() == {"entries": [], "tagalongs": []}
 
 
 def test_encoder(vault: Vault, nodes: list[Node]):

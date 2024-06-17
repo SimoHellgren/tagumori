@@ -4,32 +4,35 @@ from filetags.src.models.vault import Vault
 from filetags.src.models.node import Node
 
 
-test_data = [
-    {
-        "name": "file1",
-        "children": [
-            {
-                "name": "A",
-                "children": [
-                    {"name": "a", "children": []},
-                    {"name": "b", "children": []},
-                ],
-            },
-            {"name": "B", "children": [{"name": "a", "children": []}]},
-        ],
-    },
-    {
-        "name": "file2",
-        "children": [
-            {
-                "name": "B",
-                "children": [
-                    {"name": "b", "children": []},
-                ],
-            }
-        ],
-    },
-]
+test_data = {
+    "entries": [
+        {
+            "name": "file1",
+            "children": [
+                {
+                    "name": "A",
+                    "children": [
+                        {"name": "a", "children": []},
+                        {"name": "b", "children": []},
+                    ],
+                },
+                {"name": "B", "children": [{"name": "a", "children": []}]},
+            ],
+        },
+        {
+            "name": "file2",
+            "children": [
+                {
+                    "name": "B",
+                    "children": [
+                        {"name": "b", "children": []},
+                    ],
+                }
+            ],
+        },
+    ],
+    "tagalongs": [],
+}
 
 
 @pytest.fixture
