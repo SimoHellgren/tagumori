@@ -10,7 +10,9 @@ from filetags.src.utils import flatten, drop
 
 
 @click.group()
-@click.option("--vault", type=click.Path(), default="./vault.json")
+@click.option(
+    "--vault", type=click.Path(), default="./vault.json", help="Defaults to vault.json"
+)
 @click.pass_context
 def cli(ctx, vault: Path):
     if not Path(vault).exists():

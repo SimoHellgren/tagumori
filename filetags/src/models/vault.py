@@ -79,6 +79,10 @@ class Vault:
             for node in nodes:
                 node.value = new
 
+        # rename also tagalongs
+        self.tagalongs = [(new, b) if a == tag else (a, b) for a, b in self.tagalongs]
+        self.tagalongs = [(a, new) if b == tag else (a, b) for a, b in self.tagalongs]
+
     def tags(self) -> set[Node]:
         return set(
             flatten((x.value for x in file.descendants()) for file in self._entries)
