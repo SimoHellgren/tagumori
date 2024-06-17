@@ -113,3 +113,11 @@ def tag(vault: Vault):
 def list_tags(vault: Vault):
     for tag in sorted(vault.tags()):
         click.echo(tag)
+
+
+@tag.command(name="rename", help="Rename a tag")
+@click.pass_obj
+@click.argument("old")
+@click.argument("new")
+def rename_tag(vault: Vault, old: str, new: str):
+    vault.rename_tag(old, new)
