@@ -92,12 +92,9 @@ def add(vault: Vault, filename: list[Path], tag: str):
 @click.option("-f", "filename", required=True, type=click.Path(), multiple=True)
 @click.option("-t", "tag", required=True, type=click.STRING)
 def remove(vault: Vault, filename: list[Path], tag: str):
-    tags = parse(tag).children
-
-    # a touch silly to construct a node here - this script would
-    # potentially benefit from not knowing implementation details
     for file in filename:
-        vault.remove_tag(Node(file, tags))
+        node = parse(tag, file)
+        vault.remove_tag(node)
 
 
 @cli.group(help="Tag management")
