@@ -214,9 +214,9 @@ def test_remove_nonexistent_tag(vault: Vault):
 
 
 def test_get_tagalongs(vault: Vault):
-    res = vault.get_tagalongs("A")
+    res = vault.get_tagalongs("AAA")
 
-    assert res == {"A", "B", "C"}
+    assert res == {"AAA", "BBB", "CCC"}
 
 
 def test_circular_tagalongs(vault: Vault):
