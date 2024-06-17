@@ -4,6 +4,7 @@ import shutil
 from tempfile import NamedTemporaryFile
 import click
 from filetags.src.models.vault import Vault
+from filetags.src.parser import parse
 
 
 @click.group()
@@ -38,9 +39,22 @@ def cli(ctx, vault: Path):
 
 @cli.command()
 @click.option("-t", "tag", is_flag=True)
+@click.option("-s", "select", default="")
+@click.option("-e", "exclude", default="")
 @click.pass_obj
-def ls(vault: Vault, tag: bool):
-    for file, tags in vault.filter():
+def ls(vault: Vault, tag: bool, select: str, exclude: str):
+    select_node = parse(select)
+    exclude_node = parse(exclude)
+
+    for file, tags in vault.entries():
+        # skip if all excludes match
+        if exclude and all(n.is_subtree(file) for n in exclude_node.children):
+            continue
+
+        # skip if includes don't match
+        if select and not all(n.is_subtree(file) for n in select_node.children):
+            continue
+
         tagstring = f"\t[{','.join(str(t) for t in tags)}]" if tag else ""
         click.echo(
             click.style(f"{file.value}", fg="green") + click.style(tagstring, fg="blue")

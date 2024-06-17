@@ -286,3 +286,43 @@ def test_find_path(nodes: list[Node]):
 
     result = list(n1.find_path([999]))
     assert not result
+
+
+def test_is_rooted_subtree(nodes: list[Node]):
+    tree = nodes[0]
+    [n1, n2, n3, n4, n5, n6, n7, n8] = nodes
+
+    assert tree.is_rooted_subtree(tree)
+
+    # roots must be same
+    assert not n2.is_rooted_subtree(n1)
+
+    # matches even when other has "extra" branches
+    assert Node(n1.value, [n2]).is_rooted_subtree(n1)
+
+    assert Node(1, [Node(2)]).is_rooted_subtree(n1)
+
+    # skipping a level shouldn't match
+    assert not Node(1, [Node(3)]).is_rooted_subtree(n1)
+
+    # non-existent child should not match
+    assert not Node(1, [Node(1000)]).is_rooted_subtree(n1)
+
+
+def test_is_subtree(nodes: list[Node]):
+    tree = nodes[0]
+    [n1, n2, n3, n4, n5, n6, n7, n8] = nodes
+
+    assert tree.is_subtree(tree)
+
+    # roots may be different
+    for n in nodes:
+        assert n.is_subtree(tree)
+
+    assert not n2.is_subtree(n3)
+
+    # skipping a level shouldn't match
+    assert not Node(1, [Node(3)]).is_subtree(n1)
+
+    # non-existent child should not match
+    assert not Node(1, [Node(1000)]).is_subtree(n1)

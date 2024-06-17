@@ -179,3 +179,26 @@ class Node(Generic[T]):
 
     def __json__(self):
         return {"name": self.value, "children": self.children}
+
+    def is_rooted_subtree(self, other: Self) -> bool:
+        """Checks if structure of self is found in other. Must match also at root.
+        Other may have paths not found in self (e.g. extra children on same level)
+        """
+        # roots must match
+        if not self.value == other.value:
+            return False
+
+        # all children of self must be subtrees of some child of other
+        for child in self.children:
+            if not any(child.is_rooted_subtree(c) for c in other.children):
+                return False
+
+        # no recursive child returned False if we got here
+        return True
+
+    def is_subtree(self, other: Self) -> bool:
+        """A more lenient version of `is_rooted_subtree` which allows
+        self to be a subtree of any node in other
+        """
+
+        return any(self.is_rooted_subtree(o) for o in other.preorder())
