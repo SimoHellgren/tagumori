@@ -102,15 +102,3 @@ def parse(entry: dict):
     children = entry["children"]
     child_tags = [parse(t) for t in children]
     return Node(name, child_tags)
-
-
-if __name__ == "__main__":
-    with open("vault.json") as f:
-        data = json.load(f)
-
-    vault = Vault.from_json(data)
-
-    for file, tags in vault.entries():
-        print(file.value, list(map(str, tags)))
-
-    print(vault.tags())

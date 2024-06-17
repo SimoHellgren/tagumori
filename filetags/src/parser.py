@@ -54,14 +54,3 @@ def parse(s: str, rootvalue="") -> Node:
     tree = parser.parse(s)
     transformer = Transformer(rootvalue)
     return transformer.transform(tree)
-
-
-if __name__ == "__main__":
-    a = parse("x")
-    print(a)
-
-    b = parse("x[a]")
-    print(b)
-
-    c = parse("x,y")
-    print(c)
