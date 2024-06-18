@@ -80,15 +80,15 @@ def show(vault: Vault, filename: str):
 @click.option(
     "-f", "filename", required=True, type=click.Path(exists=True), multiple=True
 )
-@click.option("-t", "tag", required=True, type=click.STRING)
-def add(vault: Vault, filename: list[Path], tag: str):
-    # Can't really support multiple tags at the moment, since
-    # they'd need to be merged in case top-level tags match
-    # (otherwise e.g. -t a -t a --> [a,a], which isn't what we want)
-
+@click.option("-t", "tag", required=True, type=click.STRING, multiple=True)
+def add(vault: Vault, filename: list[Path], tag: list[str]):
     for file in filename:
-        node = parse(tag, file)
-        vault.add_tag(node)
+        nodes = [parse(t, file) for t in tag]
+        first, *rest = nodes
+        for node in rest:
+            first.merge(node)
+
+        vault.add_tag(first)
 
 
 @cli.command(help="Remove tags from files")
@@ -96,11 +96,12 @@ def add(vault: Vault, filename: list[Path], tag: str):
 @click.option(
     "-f", "filename", required=True, type=click.Path(exists=True), multiple=True
 )
-@click.option("-t", "tag", required=True, type=click.STRING)
-def remove(vault: Vault, filename: list[Path], tag: str):
+@click.option("-t", "tag", required=True, type=click.STRING, multiple=True)
+def remove(vault: Vault, filename: list[Path], tag: list[str]):
     for file in filename:
-        node = parse(tag, file)
-        vault.remove_tag(node)
+        for t in tag:
+            node = parse(t, file)
+            vault.remove_tag(node)
 
 
 @cli.group(help="Tag management")
