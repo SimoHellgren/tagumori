@@ -1,108 +1,270 @@
-from filetags.src.models import Vault
+from filetags.src.models.vault import Vault
+from filetags.src.models.vault import Node
 
 
-def test_open_vault(vault: Vault):
-    assert vault.entries
-    assert vault.tags
+def test_vault(vault: Vault):
+    assert vault
+    assert vault._entries
 
 
-def test_basic_tagalong(vault: Vault):
-    A = vault.get_tag("A")
-    tagalongs = vault.get_tagalongs(A)
+def test_entries(vault: Vault):
+    filenames = [a.value for a, _ in vault.entries()]
+    assert "file1" in filenames
+    assert "file2" in filenames
 
-    assert {"a", "A"} == tagalongs
+
+def test_find(vault: Vault):
+    assert vault.find(lambda x: x.value == "file1")
+    assert not vault.find(lambda x: x.value == "file999")
 
 
-def test_no_tagalongs(vault: Vault):
-    """Getting tagalongs for a tag without any should return just that tag's label"""
-    y = vault.get_tag("y")
-    tagalongs = vault.get_tagalongs(y)
+def test_filter_include(vault: Vault):
+    # get nodes for setup
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
 
-    assert {"y"} == tagalongs
+    # empty `include` should include all files
+    find_result = vault.filter()
+    entries = vault.entries()
+    assert list(find_result) == list(entries)
+
+    # transpose to get a nice list of files
+    (files, _) = zip(*vault.filter([[Node("A")]]))
+
+    assert file1 in files
+    assert file2 not in files
+
+    (files, _) = zip(*vault.filter([[Node("b")]]))
+
+    assert file1 in files
+    assert file2 in files
+
+    (files, _) = zip(*vault.filter([[Node("B", [Node("b")])]]))
+
+    assert file1 not in files
+    assert file2 in files
+
+    result = list(vault.filter([[Node("XXX")]]))
+
+    assert not result
+
+
+def test_filter_exclude(vault: Vault):
+    # get nodes for setup
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    # test(s) for excluding
+    (files, _) = zip(
+        *vault.filter(include=[[Node("b")]], exclude=[[Node("B", [Node("b")])]])
+    )
+    assert file1 in files
+    assert file2 not in files
+
+    # exclude A,B should only filter out file1
+    files, _ = zip(*vault.filter(exclude=[[Node("A"), Node("B")]]))
+
+    assert file1 not in files
+    assert file2 in files
+
+    # exclude A|B should filter out both
+    result = list(vault.filter(exclude=[[Node("A")], [Node("B")]]))
+
+    assert not result
+
+
+def test_filter_or(vault: Vault):
+    # get nodes for setup
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    (files, _) = zip(*vault.filter([[Node("A")], [Node("B")]]))
+
+    assert file1 in files
+    assert file2 in files
+
+
+def test_rename_tag(vault: Vault):
+    # get nodes for setup
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    vault.rename_tag("a", "x")
+
+    match = lambda val: lambda x: x.value == val
+
+    # file 1 should match x but not a
+    assert not file1.find(match("a"))
+    assert file1.find(match("x"))
+
+    # file 2 didn't have a to begin with: should match neither
+    assert not file2.find(match("a"))
+    assert not file2.find(match("x"))
+
+
+def test_add_new_entry(vault: Vault):
+    entry = Node("file3", children=[Node("random new tag")])
+
+    vault.add_entry(entry)
+
+    filenames = [a.value for a, _ in vault.entries()]
+    assert "file1" in filenames
+    assert "file2" in filenames
+    assert "file3" in filenames
+
+    file1, file2, file3 = sorted(vault._entries, key=lambda x: x.value)
+
+    assert "random new tag" in [t.value for t in file3.children]
+
+
+def test_add_existing_entry(vault: Vault):
+    entry = Node("file1", children=[Node("other new tag")])
+
+    vault.add_entry(entry)  # should not do anything
+
+    assert entry not in vault._entries
+    assert not list(vault.filter([[Node("other new tag")]]))
+
+
+def test_remove_entry(vault: Vault):
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+    entry1 = vault.remove_entry("file1")
+
+    assert entry1 is file1
+    assert file1 not in vault._entries
+    assert file2 in vault._entries
+
+
+def test_remove_non_existent(vault: Vault):
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+    entry2 = vault.remove_entry("file999")
+
+    assert not entry2
+    assert file1 in vault._entries
+    assert file2 in vault._entries
+
+
+def test_add_tag(vault: Vault):
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    # new top-level tag
+    tag = Node("file1", [Node("C", [Node("c")])])
+
+    vault.add_tag(tag)
+
+    assert [c.value for c in file1.children] == ["A", "B", "C"]
+
+
+def test_add_tag_new_file(vault: Vault):
+    # new file should get added
+    tag = Node("file3", [Node("X")])
+
+    vault.add_tag(tag)
+
+    file3 = vault.find(lambda x: x.value == "file3")
+
+    assert file3
+    (x,) = file3.children
+
+    assert x.value == "X"
+
+
+def test_add_nested_tag(vault: Vault):
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    # new top-level tag
+    tag = Node("file1", [Node("A", [Node("c")])])
+
+    vault.add_tag(tag)
+    a, b = file1.children
+
+    assert [c.value for c in file1.children] == ["A", "B"]
+    assert "c" in [c.value for c in a.children]
+
+
+def test_add_nested_tag(vault: Vault):
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    # new nested tag
+    tag = Node("file1", [Node("A", [Node("c")])])
+
+    vault.add_tag(tag)
+    a, b = file1.children
+
+    assert [c.value for c in file1.children] == ["A", "B"]
+    assert "c" in [c.value for c in a.children]
+
+
+def test_add_existing_tag(vault: Vault):
+    before, _ = sorted(vault._entries, key=lambda x: x.value)
+
+    # existing tag
+    tag = Node("file1", [Node("A", [Node("b")])])
+
+    vault.add_tag(tag)
+
+    after, _ = sorted(vault._entries, key=lambda x: x.value)
+
+    assert list(before.preorder()) == list(after.preorder())
+
+
+def test_remove_tag(vault: Vault):
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    a, b = file1.children
+
+    vault.remove_tag(Node("file1", [Node("A")]))
+
+    assert a not in file1.children
+
+
+def test_remove_nested_tag(vault: Vault):
+    file1, file2 = sorted(vault._entries, key=lambda x: x.value)
+
+    A, B = file1.children
+    a, b = A.children
+
+    vault.remove_tag(Node("file1", [Node("A", [Node("a")])]))
+
+    assert A in file1.children
+    assert a not in A.children
+    assert b in A.children
+
+
+def test_remove_nonexistent_tag(vault: Vault):
+    before, _ = sorted(vault._entries, key=lambda x: x.value)
+
+    tag = Node("file1", [Node("A", [Node("XXX")])])
+
+    vault.remove_tag(tag)
+
+    after, _ = sorted(vault._entries, key=lambda x: x.value)
+
+    assert list(before.preorder()) == list(after.preorder())
+
+
+def test_get_tagalongs(vault: Vault):
+    res = vault.get_tagalongs("AAA")
+
+    assert res == {"AAA", "BBB", "CCC"}
 
 
 def test_circular_tagalongs(vault: Vault):
-    """Circular tagalongs should not cause an infinite loop"""
-    x = vault.get_tag("x")
-    tagalongs = vault.get_tagalongs(x)
+    res = vault.get_tagalongs("rock")
 
-    assert {"x", "xx", "xxx"} == tagalongs
+    assert res == {"rock", "paper", "scissors"}
 
 
-def test_add_tagalongs(vault: Vault):
-    y = vault.get_tag("y")
-    big_y = vault.get_tag("Y")
+def test_no_tagalongs(vault: Vault):
+    res = vault.get_tagalongs("just me, I'm afraid")
 
-    assert y
-    assert not big_y  # should not exist yet
-
-    assert not y.tag_along  # should be empty
-
-    vault.add_tagalongs("y", {"Y"})
-
-    big_y = vault.get_tag("Y")
-    assert big_y  # should be created now
-    assert y.tag_along == {"Y"}
+    assert res == {"just me, I'm afraid"}
 
 
-def test_add_tagalongs_preserves_existing(vault: Vault):
-    x = vault.get_tag("x")
-    current = set(x.tag_along)
+def test_add_tag_with_tagalong(vault: Vault):
+    tag = Node("file1", [Node("paper")])
 
-    vault.add_tagalongs("x", {"y", "yy"})
+    vault.add_tag(tag)
 
-    assert current.issubset(x.tag_along)
+    file1, *rest = sorted(vault._entries, key=lambda x: x.value)
 
-
-def test_files_all(vault: Vault):
-    files = [
-        "demo1",
-        "demo2",
-        "demo3",
-    ]
-
-    vault_ls = vault.files()
-
-    for file in files:
-        assert file in vault_ls
-
-
-def test_files_filters(vault: Vault):
-    # select single tag
-    assert sorted(vault.files([{"a"}])) == ["demo1", "demo3"]
-
-    # select and'd tags
-    assert sorted(vault.files([{"x", "xx"}])) == ["demo3"]
-
-    # select or'd tags
-    assert sorted(vault.files([{"x"}, {"y"}])) == ["demo2", "demo3"]
-
-    # exclude single tag
-    assert sorted(vault.files(exclude=[{"a"}])) == ["demo2", "demo4"]
-
-    # exclude and'd tags
-    assert sorted(vault.files(exclude=[{"a", "x"}])) == ["demo1", "demo2", "demo4"]
-
-    # exclude or'd tags
-    assert sorted(vault.files(exclude=[{"a"}, {"y"}])) == ["demo4"]
-
-    # both select and exclude
-    assert sorted(vault.files(select=[{"a"}], exclude=[{"x"}])) == ["demo1"]
-
-
-def test_delete_tag(vault: Vault):
-    vault.delete_tag("x")
-
-    # tag should no longer exist
-    assert not vault.get_tag("x")
-
-    # no files should be tagged with tag
-    assert not vault.files(select=[{"x"}])
-
-    # tag shuold not be any other tag's tagalong
-    for tag in vault.tags:
-        assert "x" not in tag.tag_along
-
-    # other tags should still be present
-    assert vault.get_tag("y")
-    assert vault.files([{"y"}])
+    values = [c.value for c in file1.children]
+    assert "rock" in values
+    assert "paper" in values
+    assert "scissors" in values

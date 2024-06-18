@@ -1,22 +1,22 @@
+from collections import Counter
 from pathlib import Path
-from typing import Set, List
-from itertools import combinations
-from collections import defaultdict, Counter
-from tempfile import NamedTemporaryFile
-import shutil
 import json
+import shutil
+from tempfile import NamedTemporaryFile
 import click
-
-from filetags.src.models import Vault, DelimitedSet
-from filetags.src.utils import flatten
+from filetags.src.models.vault import Vault
+from filetags.src.parser import parse
+from filetags.src.utils import flatten, drop
 
 
 @click.group()
-@click.option("--vault", type=click.Path(), default="./vault.json")
+@click.option(
+    "--vault", type=click.Path(), default="./vault.json", help="Defaults to vault.json"
+)
 @click.pass_context
 def cli(ctx, vault: Path):
     if not Path(vault).exists():
-        vault_obj = Vault(defaultdict(set), set())
+        vault_obj = Vault([], [])
 
     else:
         with open(vault) as f:
@@ -41,143 +41,136 @@ def cli(ctx, vault: Path):
         Path(f.name).unlink()
 
 
-@cli.command(help="Show a file and its tags")
+@cli.command(help="List files (with optional filters)")
+@click.option("-t", "tag", is_flag=True)
+@click.option("-s", "select", multiple=True)
+@click.option("-e", "exclude", multiple=True)
 @click.pass_obj
-@click.argument("filename", type=click.Path(exists=True))
+def ls(vault: Vault, tag: bool, select: str, exclude: str):
+    # Having to specify children here is a touch clunky.
+    # Could just have parse return a list instead - will consider.
+    select_nodes = [parse(s).children for s in select]
+    exclude_nodes = [parse(e).children for e in exclude]
+
+    for file, tags in vault.filter(select_nodes, exclude_nodes):
+        tagstring = f"\t[{','.join(str(t) for t in tags)}]" if tag else ""
+        click.echo(
+            click.style(f"{file.value}", fg="green") + click.style(tagstring, fg="blue")
+        )
+
+
+@cli.command(help="Show details of one or more files")
+@click.pass_obj
+@click.argument("filename", nargs=-1)
 def show(vault: Vault, filename: str):
-    res = vault.get_file(filename)
-    if res:
-        click.echo(f"{filename}: [{', '.join(res)}]")
-    else:
-        click.echo(f"Couldn't find {filename}")
+
+    for f in filename:
+        file = vault.find(lambda x: x.value == f)
+
+        if file:
+            tagstring = f"\t[{','.join(str(t) for t in file.children)}]"
+            click.echo(
+                click.style(f"{file.value}", fg="green")
+                + click.style(tagstring, fg="blue")
+            )
 
 
 @cli.command(help="Add tags to files")
 @click.pass_obj
-@click.option("-t", "tags", type=DelimitedSet(), multiple=True)
-@click.option("-f", "filename", type=click.Path(exists=True), multiple=True)
-@click.option("-r", "read", type=click.File("r"), help="Read file or stdin (-r -)")
-def add_tag(vault: Vault, filename: List[Path], tags: list[set[str]], read: str):
-    all_tags = set(flatten(tags))
-    filenames = filename or []
-    if read:
-        filenames.extend(read.read().strip().split("\n"))
+@click.option(
+    "-f", "filename", required=True, type=click.Path(exists=True), multiple=True
+)
+@click.option("-t", "tag", required=True, type=click.STRING, multiple=True)
+def add(vault: Vault, filename: list[Path], tag: list[str]):
+    for file in filename:
+        nodes = [parse(t, file) for t in tag]
+        first, *rest = nodes
+        for node in rest:
+            first.merge(node)
 
-    for fn in filenames:
-        vault.add_tags(fn, all_tags)
+        vault.add_tag(first)
 
 
 @cli.command(help="Remove tags from files")
 @click.pass_obj
-@click.option("-t", "tags", type=DelimitedSet())
-@click.option("-f", "filename", type=click.Path(exists=True), multiple=True)
-def remove_tag(vault: Vault, filename: List[Path], tags: Set[str]):
-    for fn in filename:
-        vault.remove_tags(fn, tags)
+@click.option(
+    "-f", "filename", required=True, type=click.Path(exists=True), multiple=True
+)
+@click.option("-t", "tag", required=True, type=click.STRING, multiple=True)
+def remove(vault: Vault, filename: list[Path], tag: list[str]):
+    for file in filename:
+        for t in tag:
+            node = parse(t, file)
+            vault.remove_tag(node)
 
 
-@cli.command(help="List files, optionally filtering by tags")
+@cli.group(help="Tag management")
 @click.pass_obj
-@click.option(
-    "-s",
-    "select",
-    type=DelimitedSet(),
-    multiple=True,
-    help="Each instance of `select` is considered an AND condition, which is then OR'd with others",
-)
-@click.option(
-    "-e",
-    "exclude",
-    type=DelimitedSet(),
-    multiple=True,
-    help="Each instance of `exclude` is considered an AND condition, which is then OR'd with others",
-)
-@click.option(
-    "-t", "tags", help="Flag to also print tags ", is_flag=True, default=False
-)
-def ls(vault: Vault, select: List[Set[str]], exclude: List[Set[str]], tags: bool):
-    for file, f_tags in vault.files(select, exclude).items():
-        tag_string = f"\t[{', '.join(f_tags)}]" if tags else ""
-        click.echo(click.style(file, fg="green") + click.style(tag_string, fg="cyan"))
-
-
-@cli.group(help="Subcommands for tag management")
-@click.pass_obj
-def tag(vault):
+def tag(vault: Vault):
     pass
 
 
-@tag.command(help="Show tag information", name="show")
-@click.pass_obj
-@click.argument("tagname")
-def show_tag(vault: Vault, tagname: str):
-    t = vault.get_tag(tagname)
-    if not t:
-        click.echo(f"Couldn't find tag {tagname}")
-
-    else:
-        click.echo(t.__json__())
-
-
-@tag.command(name="ls")
+@tag.command(name="ls", help="List all tags")
 @click.pass_obj
 def list_tags(vault: Vault):
-    for tag in sorted(vault.tags, key=lambda x: x.name):
+    for tag in sorted(vault.tags()):
         click.echo(tag)
 
 
-@tag.command()
-@click.option("-t", "tag", type=click.STRING, required=True)
-@click.option("--tag-along", type=DelimitedSet())
+@tag.command(name="rename", help="Rename a tag")
 @click.pass_obj
-def create(vault: Vault, tag: str, tag_along):
-    vault.create_tag(tag, tag_along)
-
-
-@tag.command()
-@click.option("-t", "tag", type=click.STRING, required=True)
-@click.pass_obj
-def delete(vault: Vault, tag: str):
-    vault.delete_tag(tag)
-
-
-@tag.command()
-@click.option("-t", "tag", type=click.STRING, required=True)
-@click.option("--tag-along", type=DelimitedSet())
-@click.pass_obj
-def add_tag_along(vault: Vault, tag: str, tag_along: Set[str]):
-    vault.add_tagalongs(tag, tag_along)
-
-
-@tag.command()
-@click.option("-t", "tag", type=click.STRING, required=True)
-@click.option("--tag-along", type=DelimitedSet())
-@click.pass_obj
-def remove_tag_along(vault: Vault, tag: str, tag_along: Set[str]):
-    vault.remove_tagalongs(tag, tag_along)
+@click.argument("old")
+@click.argument("new")
+def rename_tag(vault: Vault, old: str, new: str):
+    vault.rename_tag(old, new)
 
 
 @tag.command(name="stats")
+@click.option("-s", "skip", type=click.INT, default=0)
+@click.option("-l", "limit", type=click.INT, default=-1)
 @click.pass_obj
-def tag_stats(vault: Vault):
-    tags = vault.tags
+def tag_stats(vault: Vault, skip: int, limit: int):
+    counts = Counter(
+        flatten((t.value for t in file.descendants()) for file, _ in vault.entries())
+    )
 
-    counts = Counter(flatten(vault.files().values()))
+    if limit < 0:
+        limit = None
+    else:
+        limit = limit + skip
 
-    for tag in tags:
-        click.echo(f"{tag.name}: {counts[tag.name]}")
+    for tag, count in drop(counts.most_common(limit), skip):
+        click.echo(f"{tag}: {count}")
 
 
-@tag.command(name="combos")
-@click.option("-n", "n", default=2, type=click.INT)
-@click.option("-k", "k", default=None, type=click.INT, help="number of combos to print")
+@cli.group(help="Tagalong management")
 @click.pass_obj
-def tag_combos(vault: Vault, n: int, k: int):
-    combos = (combinations(it, n) for it in vault.entries.values())
-
-    for names, count in Counter(flatten(map(tuple, combos))).most_common(k):
-        click.echo(f"{names}: {count}")
+def tagalong(vault: Vault):
+    pass
 
 
-if __name__ == "__main__":
-    cli()
+@tagalong.command(name="ls")
+@click.pass_obj
+def list_tagalongs(vault: Vault):
+    for a, b in sorted(vault.tagalongs):
+        click.echo(f"{a} -> {b}")
+
+
+@tagalong.command(name="add")
+@click.pass_obj
+@click.option("-t", "tag", multiple=True)
+@click.option("-ta", "tagalong", multiple=True)
+def add_tagalong(vault: Vault, tag: str, tagalong: str):
+    for x in tag:
+        for y in tagalong:
+            vault.add_tagalong(x, y)
+
+
+@tagalong.command(name="remove")
+@click.pass_obj
+@click.option("-t", "tag", multiple=True)
+@click.option("-ta", "tagalong", multiple=True)
+def remove_tagalong(vault: Vault, tag: str, tagalong: str):
+    for x in tag:
+        for y in tagalong:
+            vault.remove_tagalong(x, y)
