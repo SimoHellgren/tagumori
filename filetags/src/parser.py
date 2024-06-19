@@ -8,15 +8,12 @@ root: list |
 tag: name [ list ]
 list: "[" [ tag ("," tag)*  ] "]" | tag ("," tag)* 
 
-?name: WORD | string
-string: STRING
+?name: WORD (" " WORD)*
 WORD: (LETTER | DIGIT | "_" | "-")+
 
 %import common.LETTER
 %import common.DIGIT
-%import common.ESCAPED_STRING -> STRING
 %import common.WS
-%ignore WS
 """
 
 
@@ -36,13 +33,9 @@ class Transformer(lark.Transformer):
         value, children = s
         return Node(value, children)
 
-    def string(self, s):
-        """Strip quotes from quoted string"""
-        (s,) = s
-        return s[1:-1]
-
     list = list
-    NAME = lambda s, n: n.value
+    name = lambda s, l: " ".join(l)
+    WORD = lambda s, w: w.value
 
 
 parser = lark.Lark(GRAMMAR, start="root")

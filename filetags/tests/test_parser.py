@@ -77,19 +77,24 @@ def test_deeply_nested():
     assert values == list("abcde")
 
 
-def test_escaped_string():
-    result = parse('"escaped string"')
+def test_multiword():
+    result = parse("test tag,other multiword tag")
 
-    (esc,) = result.children
-    assert esc.value == "escaped string"
+    (a, b) = result.children
+    assert a.value == "test tag"
+    assert b.value == "other multiword tag"
 
 
-def test_nested_escaped_string():
-    result = parse('"escaped string"[subtag,"escaped subtag"]')
+def test_nested_multiword():
+    result = parse("test tag[child],other multiword tag[child,multiword child]")
+    (a, b) = result.children
 
-    (esc,) = result.children
-    subtag, esc_subtag = esc.children
+    assert a.value == "test tag"
+    assert b.value == "other multiword tag"
 
-    assert esc.value == "escaped string"
-    assert subtag.value == "subtag"
-    assert esc_subtag.value == "escaped subtag"
+    (x,) = a.children
+    y, z = b.children
+
+    assert x.value == "child"
+    assert y.value == "child"
+    assert z.value == "multiword child"
