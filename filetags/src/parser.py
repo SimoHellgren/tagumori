@@ -39,7 +39,6 @@ class Transformer(lark.Transformer):
     def string(self, s):
         """Strip quotes from quoted string"""
         (s,) = s
-        print("handling", s)
         return s[1:-1]
 
     list = list
