@@ -10,6 +10,7 @@ from filetags.src.utils import flatten, drop
 
 # constants for internal, reserved tags
 LIKE_TAG = "__liked"
+RATING_TAG = "__rating"
 
 
 @click.group()
@@ -123,6 +124,25 @@ def like(context: click.Context, filename: list[Path]):
 )
 def unlike(context: click.Context, filename: list[Path]):
     context.forward(remove, tag=[LIKE_TAG])
+
+
+@cli.command(help="Rate files")
+@click.pass_context
+@click.option(
+    "-f", "filename", required=True, type=click.Path(exists=True), multiple=True
+)
+@click.option("-r", "rating", required=True, type=click.IntRange(0, 100))
+def rate(context: click.Context, filename: list[Path], rating: int):
+    context.invoke(add, filename=filename, tag=[RATING_TAG + f"[{rating}]"])
+
+
+@cli.command(help="Unrate files")
+@click.pass_context
+@click.option(
+    "-f", "filename", required=True, type=click.Path(exists=True), multiple=True
+)
+def unrate(context: click.Context, filename: list[Path]):
+    context.forward(remove, tag=[RATING_TAG])
 
 
 @cli.group(help="Tag management")
