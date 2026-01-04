@@ -3,6 +3,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import click
+from db.init import init_db
 
 VAULT_PATH = Path("vault.db")
 
@@ -10,6 +11,17 @@ VAULT_PATH = Path("vault.db")
 @click.group()
 def cli():
     pass
+
+
+@cli.command()
+@click.argument("filepath", type=click.Path(path_type=Path), default="vault.db")
+def init(filepath: Path):
+    if filepath.exists():
+        click.echo(f"{filepath} already exists.")
+
+    else:
+        init_db(filepath)
+        click.echo(f"{filepath} created.")
 
 
 @cli.command()
