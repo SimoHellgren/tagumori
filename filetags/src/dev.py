@@ -70,26 +70,5 @@ def load_json_vault(vault: Path, json_vault: str):
             )
 
 
-def add_filetags(vault: Path, file_id: int, node, parent_id=None):
-    """Adds a node and it's children recursively"""
-
-    value, children = node
-
-    with sqlite3.connect(vault) as conn:
-        (tag_id,) = conn.execute("SELECT id FROM tag WHERE name=?", (value,)).fetchone()
-
-        (ft_id,) = conn.execute(
-            """
-            INSERT INTO file_tag(file_id, tag_id, parent_id) VALUES (?,?,?)
-            ON CONFLICT DO UPDATE SET file_id = file_id
-            RETURNING id
-        """,
-            (file_id, tag_id, parent_id),
-        ).fetchone()
-
-    for child in children:
-        add_filetags(vault, file_id, child, ft_id)
-
-
 if __name__ == "__main__":
     load_json_vault(VAULT_PATH, "vault.json")
