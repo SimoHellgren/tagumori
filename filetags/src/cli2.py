@@ -1,12 +1,17 @@
 import sqlite3
-from collections import defaultdict
 from pathlib import Path
 
 import click
 
 from filetags.src.db.connect import get_vault
 from filetags.src.db.file import get_or_create_file
-from filetags.src.db.file_tag import attach_tag, detach_tag, resolve_path
+from filetags.src.db.file_tag import (
+    attach_tag,
+    build_tree,
+    detach_tag,
+    get_files_tags,
+    resolve_path,
+)
 from filetags.src.db.init import init_db
 from filetags.src.db.tag import get_or_create_tag
 from filetags.src.parser import parse
@@ -24,6 +29,10 @@ VAULT_PATH = Path("vault.db")
 )
 @click.pass_context
 def cli(ctx: click.Context, vault: Path):
+    # skip checking / getting connection if running init
+    if ctx.invoked_subcommand == "init":
+        return
+
     if not vault.exists():
         raise click.ClickException(
             f"{vault} does not exist. Run `ftag init {vault}` to create"
@@ -95,45 +104,17 @@ def remove(vault: sqlite3.Connection, files, tags):
 
 
 # testing stuff from this point down, to be refactored.
-@cli.command()
+@cli.command(help="Show tags of files")
 @click.argument("files", nargs=-1, type=click.Path(path_type=Path))
 @click.pass_obj
 def show(vault: sqlite3.Connection, files: tuple[Path, ...]):
     with vault as conn:
-        placeholders = ",".join("?" for _ in files)
-        q = f"""
-            SELECT
-                file_tag.id,
-                tag.name,
-                file_tag.parent_id
-            FROM file_tag
-            JOIN file
-                ON file.id = file_tag.file_id
-            JOIN tag
-                on tag.id = file_tag.tag_id
-            WHERE file.path in ({placeholders})
-            ORDER BY parent_id, name
-        """
-        result = conn.execute(q, [str(f) for f in files]).fetchall()
+        result = get_files_tags(conn, files)
+        roots = build_tree(result)
 
-    children = defaultdict(list)
-    names = {}
-
-    for id_, tag, parent_id in result:
-        names[id_] = tag
-        children[parent_id].append(id_)
-
-    def format_tags(id_):
-        if id_ not in children:
-            return names[id_]
-
-        inner = ",".join(format_tags(child) for child in children[id_])
-
-        return f"{names[id_]}[{inner}]"
-
-    roots = children[None]
-    for root in roots:
-        print(format_tags(root))
+    # TODO: per file with filenames (probably easiest to just loop over `files`,
+    # editing get_files_tags to accommodate
+    click.echo(",".join(str(root) for root in roots))
 
 
 def main():

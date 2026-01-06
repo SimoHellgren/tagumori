@@ -1,3 +1,4 @@
+from pathlib import Path
 from sqlite3 import Connection
 
 from filetags.src.models.node import Node
@@ -28,6 +29,46 @@ def resolve_path(conn: Connection, file_id: int, path: tuple[Node]):
         parent_id = row[0]
 
     return parent_id
+
+
+# TODO: consider if this belongs elsewhere or if should be "packaged" differently.
+# As it stands, this is rather coupled with get_files_tags
+def build_tree(file_tags: list) -> Node:
+    roots: list[Node] = []
+    nodes: dict[str | None, Node] = {}
+
+    # construct nodes
+    for id_, tag, parent_id in file_tags:
+        nodes[id_] = Node(value=tag)
+
+    # add children & record root nodes
+    for id_, _, parent_id in file_tags:
+        node = nodes[id_]
+        if parent_id is None:
+            roots.append(node)
+        else:
+            nodes[parent_id].add_child(node)
+
+    return roots
+
+
+def get_files_tags(conn: Connection, files: list[Path]):
+    placeholders = ",".join("?" for _ in files)
+    q = f"""
+        SELECT
+            file_tag.id,
+            tag.name,
+            file_tag.parent_id
+        FROM file_tag
+        JOIN file
+            ON file.id = file_tag.file_id
+        JOIN tag
+            on tag.id = file_tag.tag_id
+        WHERE file.path in ({placeholders})
+        ORDER BY parent_id, name
+    """
+    result = conn.execute(q, [str(f) for f in files]).fetchall()
+    return result
 
 
 def attach_tag(
