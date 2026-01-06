@@ -6,7 +6,7 @@ import click
 
 from filetags.src.db.connect import get_vault
 from filetags.src.db.file import get_or_create_file
-from filetags.src.db.file_tag import attach_tag
+from filetags.src.db.file_tag import attach_tag, detach_tag, resolve_path
 from filetags.src.db.init import init_db
 from filetags.src.db.tag import get_or_create_tag
 from filetags.src.parser import parse
@@ -55,6 +55,29 @@ def add(files, tags):
             file_id = get_or_create_file(conn, file)
             for root in root_tags:
                 attach_tree(conn, file_id, root)
+
+
+@cli.command(help="Remove tags from files")
+@click.option(
+    "-f",
+    "files",
+    required=True,
+    type=click.Path(path_type=Path, exists=True),
+    multiple=True,
+)
+@click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
+def remove(files, tags):
+    root_tags = flatten(parse(t).children for t in tags)
+
+    with get_vault() as conn:
+        for file in files:
+            file_id = get_or_create_file(conn, file)
+
+            for root in root_tags:
+                for path in root.paths_down():
+                    file_tag_id = resolve_path(conn, file_id, path)
+                    if file_tag_id:
+                        detach_tag(conn, file_tag_id)
 
 
 # testing stuff from this point down, to be refactored.
