@@ -96,10 +96,11 @@ def remove(vault: sqlite3.Connection, files, tags):
 
 # testing stuff from this point down, to be refactored.
 @cli.command()
-@click.argument("filename", nargs=-1)
-def show(filename):
-    with sqlite3.connect(VAULT_PATH) as conn:
-        placeholders = ",".join("?" for _ in filename)
+@click.argument("files", nargs=-1, type=click.Path(path_type=Path))
+@click.pass_obj
+def show(vault: sqlite3.Connection, files: tuple[Path, ...]):
+    with vault as conn:
+        placeholders = ",".join("?" for _ in files)
         q = f"""
             SELECT
                 file_tag.id,
@@ -113,7 +114,7 @@ def show(filename):
             WHERE file.path in ({placeholders})
             ORDER BY parent_id, name
         """
-        result = conn.execute(q, filename).fetchall()
+        result = conn.execute(q, [str(f) for f in files]).fetchall()
 
     children = defaultdict(list)
     names = {}
