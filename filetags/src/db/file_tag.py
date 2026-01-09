@@ -52,22 +52,19 @@ def build_tree(file_tags: list) -> Node:
     return roots
 
 
-def get_files_tags(conn: Connection, files: list[Path]):
-    placeholders = ",".join("?" for _ in files)
+def get_file_tags(conn: Connection, file_id: int):
     q = f"""
         SELECT
             file_tag.id,
             tag.name,
             file_tag.parent_id
         FROM file_tag
-        JOIN file
-            ON file.id = file_tag.file_id
         JOIN tag
             on tag.id = file_tag.tag_id
-        WHERE file.path in ({placeholders})
+        WHERE file_tag.file_id = ?
         ORDER BY parent_id, name
     """
-    result = conn.execute(q, [str(f) for f in files]).fetchall()
+    result = conn.execute(q, (file_id,)).fetchall()
     return result
 
 

@@ -9,7 +9,7 @@ from filetags.src.db.file_tag import (
     attach_tag,
     build_tree,
     detach_tag,
-    get_files_tags,
+    get_file_tags,
     resolve_path,
 )
 from filetags.src.db.init import init_db
@@ -109,13 +109,17 @@ def remove(vault: sqlite3.Connection, files, tags):
 @click.pass_obj
 def show(vault: sqlite3.Connection, files: tuple[Path, ...]):
     with vault as conn:
-        result = get_files_tags(conn, files)
-        roots = build_tree(result)
-
-    # TODO: per file with filenames (probably easiest to just loop over `files`,
-    # editing get_files_tags to accommodate
-    click.echo(",".join(str(root) for root in roots))
-
+        for file in files:
+            file_id = get_or_create_file(conn, file)
+            tags = get_file_tags(conn, file_id)
+        
+            roots = build_tree(tags)
+            
+            click.echo(
+                click.style(file, fg="green")
+                + "\t" + 
+                click.style(",".join(str(root) for root in roots),fg="cyan")
+            )
 
 def main():
     cli()
