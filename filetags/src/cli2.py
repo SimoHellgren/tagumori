@@ -14,6 +14,7 @@ from filetags.src.db.file_tag import (
 )
 from filetags.src.db.init import init_db
 from filetags.src.db.tag import get_or_create_tag
+from filetags.src.models.node import Node
 from filetags.src.parser import parse
 from filetags.src.utils import flatten
 
@@ -69,7 +70,7 @@ def attach_tree(conn, file_id, node, parent_id=None):
 )
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
 @click.pass_obj
-def add(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str,...]):
+def add(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, ...]):
     root_tags = flatten(parse(t).children for t in tags)
 
     with vault as conn:
@@ -89,7 +90,7 @@ def add(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str,...]
 )
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
 @click.pass_obj
-def remove(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str,...]):
+def remove(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, ...]):
     root_tags = flatten(parse(t).children for t in tags)
 
     with vault as conn:
@@ -111,14 +112,15 @@ def show(vault: sqlite3.Connection, files: tuple[Path, ...]):
         for file in files:
             file_id = get_or_create_file(conn, file)
             tags = get_file_tags(conn, file_id)
-        
+
             roots = build_tree(tags)
-            
+
             click.echo(
                 click.style(file, fg="green")
-                + "\t" + 
-                click.style(",".join(str(root) for root in roots),fg="cyan")
+                + "\t"
+                + click.style(",".join(str(root) for root in roots), fg="cyan")
             )
+
 
 @cli.command(help="Replace tags on files", name="set")
 @click.option(
@@ -130,33 +132,32 @@ def show(vault: sqlite3.Connection, files: tuple[Path, ...]):
 )
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
 @click.pass_obj
-def set_(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str,...]):
-    root_tags = flatten(parse(t).children for t in tags)
+def set_(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, ...]):
+    root = Node("root", list(flatten(parse(t).children for t in tags)))
+    _, *nodes = root.preorder()
 
-    nodes = flatten(parse(t).preorder() for t in tags)
-    desired_paths = set(tuple(n.path()[1:]) for n in nodes if not n.is_root)
+    desired_paths = set(tuple(n.path()[1:]) for n in nodes)
 
-    with vault as conn:        
+    with vault as conn:
         for file in files:
             file_id = get_or_create_file(conn, file)
 
             # attach new tags
-            for root in root_tags:
-                attach_tree(conn, file_id, root)
-
+            for node in root.children:
+                attach_tree(conn, file_id, node)
 
             # remove other tags
             tags = get_file_tags(conn, file_id)
-        
+
             roots = build_tree(tags)
             db_nodes = flatten(n.preorder() for n in roots)
             existing_paths = set(n.path() for n in db_nodes)
 
-            paths_to_delete = existing_paths-desired_paths
+            paths_to_delete = existing_paths - desired_paths
             for path in paths_to_delete:
                 file_tag_id = resolve_path(conn, file_id, path)
                 detach_tag(conn, file_tag_id)
-            
+
 
 def main():
     cli()
