@@ -33,7 +33,7 @@ def resolve_path(conn: Connection, file_id: int, path: tuple[Node, ...]) -> int:
 
 # TODO: consider if this belongs elsewhere or if should be "packaged" differently.
 # As it stands, this is rather coupled with get_files_tags
-def build_tree(file_tags: list) -> Node:
+def build_tree(file_tags: list) -> list[Node]:
     roots: list[Node] = []
     nodes: dict[str | None, Node] = {}
 

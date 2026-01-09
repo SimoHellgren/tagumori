@@ -218,3 +218,9 @@ class Node(Generic[T]):
 
             else:
                 self.add_child(child)
+    
+    def __eq__(self, other: Self) -> bool:
+        return self.value == other.value
+    
+    def __hash__(self):
+        return hash(self.value)

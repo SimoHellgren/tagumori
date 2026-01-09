@@ -69,7 +69,7 @@ def attach_tree(conn, file_id, node, parent_id=None):
 )
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
 @click.pass_obj
-def add(vault: sqlite3.Connection, files, tags):
+def add(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str,...]):
     root_tags = flatten(parse(t).children for t in tags)
 
     with vault as conn:
@@ -89,7 +89,7 @@ def add(vault: sqlite3.Connection, files, tags):
 )
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
 @click.pass_obj
-def remove(vault: sqlite3.Connection, files, tags):
+def remove(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str,...]):
     root_tags = flatten(parse(t).children for t in tags)
 
     with vault as conn:
@@ -119,6 +119,44 @@ def show(vault: sqlite3.Connection, files: tuple[Path, ...]):
                 + "\t" + 
                 click.style(",".join(str(root) for root in roots),fg="cyan")
             )
+
+@cli.command(help="Replace tags on files", name="set")
+@click.option(
+    "-f",
+    "files",
+    required=True,
+    type=click.Path(path_type=Path, exists=True),
+    multiple=True,
+)
+@click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
+@click.pass_obj
+def set_(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str,...]):
+    root_tags = flatten(parse(t).children for t in tags)
+
+    nodes = flatten(parse(t).preorder() for t in tags)
+    desired_paths = set(tuple(n.path()[1:]) for n in nodes if not n.is_root)
+
+    with vault as conn:        
+        for file in files:
+            file_id = get_or_create_file(conn, file)
+
+            # attach new tags
+            for root in root_tags:
+                attach_tree(conn, file_id, root)
+
+
+            # remove other tags
+            tags = get_file_tags(conn, file_id)
+        
+            roots = build_tree(tags)
+            db_nodes = flatten(n.preorder() for n in roots)
+            existing_paths = set(n.path() for n in db_nodes)
+
+            paths_to_delete = existing_paths-desired_paths
+            for path in paths_to_delete:
+                file_tag_id = resolve_path(conn, file_id, path)
+                detach_tag(conn, file_tag_id)
+            
 
 def main():
     cli()
