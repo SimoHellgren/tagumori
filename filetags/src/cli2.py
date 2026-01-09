@@ -103,7 +103,6 @@ def remove(vault: sqlite3.Connection, files, tags):
                         detach_tag(conn, file_tag_id)
 
 
-# testing stuff from this point down, to be refactored.
 @cli.command(help="Show tags of files")
 @click.argument("files", nargs=-1, type=click.Path(path_type=Path))
 @click.pass_obj
