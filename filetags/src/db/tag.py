@@ -1,7 +1,7 @@
 from sqlite3 import Connection
 
 
-def get_or_create_tag(conn: Connection, tag: str):
+def get_or_create_tag(conn: Connection, tag: str) -> int:
     q = """
         INSERT INTO tag(name) VALUES (?)
         ON CONFLICT (name) DO UPDATE SET name=name --no-op

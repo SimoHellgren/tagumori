@@ -4,7 +4,7 @@ from sqlite3 import Connection
 from filetags.src.models.node import Node
 
 
-def resolve_path(conn: Connection, file_id: int, path: tuple[Node]):
+def resolve_path(conn: Connection, file_id: int, path: tuple[Node, ...]) -> int:
     parent_id = None
     for node in path:
         row = conn.execute(
@@ -52,7 +52,7 @@ def build_tree(file_tags: list) -> Node:
     return roots
 
 
-def get_file_tags(conn: Connection, file_id: int):
+def get_file_tags(conn: Connection, file_id: int) -> list[tuple[int, str, int]]:
     q = f"""
         SELECT
             file_tag.id,
@@ -70,7 +70,7 @@ def get_file_tags(conn: Connection, file_id: int):
 
 def attach_tag(
     conn: Connection, file_id: int, tag_id: int, parent_id: int | None = None
-):
+) -> int:
     (file_tag_id,) = conn.execute(
         """
             INSERT INTO file_tag(file_id, tag_id, parent_id) VALUES (?,?,?)
@@ -83,5 +83,5 @@ def attach_tag(
     return file_tag_id
 
 
-def detach_tag(conn: Connection, file_tag_id: int):
+def detach_tag(conn: Connection, file_tag_id: int) -> None:
     conn.execute("DELETE FROM file_tag WHERE id = ?", (file_tag_id,))
