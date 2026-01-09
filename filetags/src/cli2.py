@@ -13,7 +13,7 @@ from filetags.src.db.file_tag import (
     resolve_path,
 )
 from filetags.src.db.init import init_db
-from filetags.src.db.tag import get_or_create_tag
+from filetags.src.db.tag import get_or_create_tag, update_tags
 from filetags.src.models.node import Node
 from filetags.src.parser import parse
 from filetags.src.utils import flatten
@@ -157,6 +157,36 @@ def set_(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, ..
             for path in paths_to_delete:
                 file_tag_id = resolve_path(conn, file_id, path)
                 detach_tag(conn, file_tag_id)
+
+
+@cli.group(help="Tag management")
+@click.pass_obj
+def tag(vault: sqlite3.Connection):
+    pass
+
+
+@tag.command(help="Edit tag", name="edit")
+@click.argument("tag", nargs=-1, type=click.STRING, required=True)
+@click.option("--name", "name", type=click.STRING)
+@click.option("--category", "category", type=click.STRING)
+@click.pass_obj
+def edit_tag(vault: sqlite3.Connection, tag: list[str], **kwargs):
+    if len(tag) > 1 and kwargs["name"]:
+        raise click.BadArgumentUsage(
+            "--name can't be present when multiple tags are given."
+        )
+
+    if not any(kwargs.values()):
+        raise click.BadArgumentUsage("Provide at least one option.")
+
+    data = {k: v for k, v in kwargs.items() if v is not None}
+
+    with vault as conn:
+        update_tags(
+            conn,
+            tag,
+            data,
+        )
 
 
 def main():
