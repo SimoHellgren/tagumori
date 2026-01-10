@@ -5,23 +5,7 @@ from typing import Optional
 
 import click
 
-from filetags.src.crud.file import get_or_create_file
-from filetags.src.crud.file_tag import (
-    attach_tag,
-    build_tree,
-    detach_tag,
-    get_file_tags,
-    replace_file_tag,
-    resolve_path,
-)
-from filetags.src.crud.tag import (
-    create_tag,
-    delete_tag,
-    get_all_tags,
-    get_or_create_tag,
-    get_tag_by_name,
-    update_tags,
-)
+from filetags.src import crud
 from filetags.src.db.connect import get_vault
 from filetags.src.db.init import init_db
 from filetags.src.models.node import Node
@@ -64,8 +48,8 @@ def init(filepath: Path):
 
 
 def attach_tree(conn, file_id, node, parent_id=None):
-    tag_id = get_or_create_tag(conn, node.value)
-    filetag_id = attach_tag(conn, file_id, tag_id, parent_id)
+    tag_id = crud.tag.get_or_create_tag(conn, node.value)
+    filetag_id = crud.file_tag.attach_tag(conn, file_id, tag_id, parent_id)
     for child in node.children:
         attach_tree(conn, file_id, child, filetag_id)
 
@@ -85,7 +69,7 @@ def add(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, ...
 
     with vault as conn:
         for file in files:
-            file_id = get_or_create_file(conn, file)
+            file_id = crud.file.get_or_create_file(conn, file)
             for root in root_tags:
                 attach_tree(conn, file_id, root)
 
@@ -105,13 +89,13 @@ def remove(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, 
 
     with vault as conn:
         for file in files:
-            file_id = get_or_create_file(conn, file)
+            file_id = crud.file.get_or_create_file(conn, file)
 
             for root in root_tags:
                 for path in root.paths_down():
-                    file_tag_id = resolve_path(conn, file_id, path)
+                    file_tag_id = crud.file_tag.resolve_path(conn, file_id, path)
                     if file_tag_id:
-                        detach_tag(conn, file_tag_id)
+                        crud.file_tag.detach_tag(conn, file_tag_id)
 
 
 @cli.command(help="Show tags of files")
@@ -120,10 +104,10 @@ def remove(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, 
 def show(vault: sqlite3.Connection, files: tuple[Path, ...]):
     with vault as conn:
         for file in files:
-            file_id = get_or_create_file(conn, file)
-            tags = get_file_tags(conn, file_id)
+            file_id = crud.file.get_or_create_file(conn, file)
+            tags = crud.file_tag.get_file_tags(conn, file_id)
 
-            roots = build_tree(tags)
+            roots = crud.file_tag.build_tree(tags)
 
             click.echo(
                 click.style(file, fg="green")
@@ -150,23 +134,23 @@ def set_(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, ..
 
     with vault as conn:
         for file in files:
-            file_id = get_or_create_file(conn, file)
+            file_id = crud.file.get_or_create_file(conn, file)
 
             # attach new tags
             for node in root.children:
                 attach_tree(conn, file_id, node)
 
             # remove other tags
-            tags = get_file_tags(conn, file_id)
+            tags = crud.file_tag.get_file_tags(conn, file_id)
 
-            roots = build_tree(tags)
+            roots = crud.file_tag.build_tree(tags)
             db_nodes = flatten(n.preorder() for n in roots)
             existing_paths = set(n.path() for n in db_nodes)
 
             paths_to_delete = existing_paths - desired_paths
             for path in paths_to_delete:
-                file_tag_id = resolve_path(conn, file_id, path)
-                detach_tag(conn, file_tag_id)
+                file_tag_id = crud.file_tag.resolve_path(conn, file_id, path)
+                crud.file_tag.detach_tag(conn, file_tag_id)
 
 
 @cli.group(help="Tag management")
@@ -181,7 +165,7 @@ def tag(vault: sqlite3.Connection):
 @click.pass_obj
 def new_tag(vault: sqlite3.Connection, name: str, category: Optional[str]):
     with vault as conn:
-        create_tag(conn, name, category)
+        crud.tag.create_tag(conn, name, category)
 
 
 @tag.command(help="Edit tag", name="edit")
@@ -210,7 +194,7 @@ def edit_tag(vault: sqlite3.Connection, tag: list[str], clear_category: bool, **
         data["category"] = None
 
     with vault as conn:
-        update_tags(
+        crud.tag.update_tags(
             conn,
             tag,
             data,
@@ -231,13 +215,13 @@ def replace_tag(
     vault: sqlite3.Connection, old: tuple[str, ...], new: str, remove: bool
 ):
     with vault as conn:
-        new_id = get_tag_by_name(conn, new)[0]
+        new_id = crud.tag.get_tag_by_name(conn, new)[0]
         for tag in old:
-            old_id = get_tag_by_name(conn, tag)[0]
-            replace_file_tag(conn, old_id, new_id)
+            old_id = crud.tag.get_tag_by_name(conn, tag)[0]
+            crud.file_tag.replace_file_tag(conn, old_id, new_id)
 
             if remove:
-                delete_tag(conn, old_id)
+                crud.tag.delete_tag(conn, old_id)
 
 
 @tag.command(help="Removes all instances of a tag.", name="delete")
@@ -251,8 +235,8 @@ def remove_tag(vault: sqlite3.Connection, tags: tuple[str, ...]):
 
     with vault as conn:
         for tag in tags:
-            tag_id = get_tag_by_name(conn, tag)[0]
-            delete_tag(conn, tag_id)
+            tag_id = crud.tag.get_tag_by_name(conn, tag)[0]
+            crud.tag.delete_tag(conn, tag_id)
 
 
 def compile_pattern(pattern: str, ignore_case: bool):
@@ -278,7 +262,7 @@ def list_tags(
     invert_match: bool,
 ):
     with vault as conn:
-        tags = get_all_tags(conn)
+        tags = crud.tag.get_all_tags(conn)
 
     regex = compile_pattern(pattern, ignore_case)
 
