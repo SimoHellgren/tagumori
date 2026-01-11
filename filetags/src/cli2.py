@@ -7,7 +7,7 @@ from filetags.src import crud
 from filetags.src.db.connect import get_vault
 from filetags.src.db.init import init_db
 from filetags.src.models.node import Node
-from filetags.src.newcli import tag_cli
+from filetags.src.newcli import tag_cli, tagalong_cli
 from filetags.src.parser import parse
 from filetags.src.utils import flatten
 
@@ -36,6 +36,7 @@ def cli(ctx: click.Context, vault: Path):
 
 
 cli.add_command(tag_cli.tag)
+cli.add_command(tagalong_cli.tagalong)
 
 
 @cli.command(help="Initialize empty vault")
