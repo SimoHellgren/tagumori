@@ -15,3 +15,7 @@ def get_or_create_file(conn: Connection, file: Path) -> int:
     (file_id,) = conn.execute(q, (str(file),)).fetchone()
 
     return file_id
+
+
+def get_all(conn: Connection):
+    return conn.execute("SELECT * FROM file ORDER BY path").fetchall()

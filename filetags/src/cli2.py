@@ -1,5 +1,5 @@
-import sqlite3
 from pathlib import Path
+from sqlite3 import Connection
 
 import click
 
@@ -71,7 +71,7 @@ def attach_tree(conn, file_id, node, parent_id=None):
 )
 @click.pass_obj
 def add(
-    vault: sqlite3.Connection,
+    vault: Connection,
     files: tuple[Path, ...],
     tags: tuple[str, ...],
     no_tagalongs: bool,
@@ -101,7 +101,7 @@ def add(
 )
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
 @click.pass_obj
-def remove(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, ...]):
+def remove(vault: Connection, files: tuple[Path, ...], tags: tuple[str, ...]):
     root_tags = flatten(parse(t).children for t in tags)
 
     with vault as conn:
@@ -118,7 +118,7 @@ def remove(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, 
 @cli.command(help="Show tags of files")
 @click.argument("files", nargs=-1, type=click.Path(path_type=Path))
 @click.pass_obj
-def show(vault: sqlite3.Connection, files: tuple[Path, ...]):
+def show(vault: Connection, files: tuple[Path, ...]):
     with vault as conn:
         for file in files:
             file_id = crud.file.get_or_create_file(conn, file)
@@ -143,7 +143,7 @@ def show(vault: sqlite3.Connection, files: tuple[Path, ...]):
 )
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
 @click.pass_obj
-def set_(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, ...]):
+def set_(vault: Connection, files: tuple[Path, ...], tags: tuple[str, ...]):
     root = Node("root", list(flatten(parse(t).children for t in tags)))
     _, *nodes = root.preorder()
 
@@ -168,6 +168,28 @@ def set_(vault: sqlite3.Connection, files: tuple[Path, ...], tags: tuple[str, ..
             for path in paths_to_delete:
                 file_tag_id = crud.file_tag.resolve_path(conn, file_id, path)
                 crud.file_tag.detach_tag(conn, file_tag_id)
+
+
+@cli.command(help="List files (with optional filters).")
+@click.option("-l", "long", type=click.BOOL, is_flag=True, help="Long listing format.")
+@click.pass_obj
+def ls(vault: Connection, long: bool):
+    # right horrendeously inefficient
+    with vault as conn:
+        files = crud.file.get_all(conn)
+        for file_id, path, *_ in files:
+            tags = crud.file_tag.get_file_tags(conn, file_id)
+
+            roots = crud.file_tag.build_tree(tags)
+
+            msg = click.style(path, fg="green")
+
+            if long:
+                msg += "\t" + click.style(
+                    ",".join(str(root) for root in roots), fg="cyan"
+                )
+
+            click.echo(msg)
 
 
 def main():
