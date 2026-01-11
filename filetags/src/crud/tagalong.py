@@ -8,6 +8,13 @@ def add(conn: Connection, source_id: int, target_id: int):
     )
 
 
+def remove(conn: Connection, source_id: int, target_id: int):
+    conn.execute(
+        "DELETE FROM tagalong WHERE tag_id = ? AND tagalong_id = ?",
+        (source_id, target_id),
+    )
+
+
 def get_all_names(conn: Connection):
     result = conn.execute("""
         SELECT t.name, ta.name

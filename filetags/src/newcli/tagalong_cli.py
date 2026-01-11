@@ -24,8 +24,26 @@ def add(vault: Connection, tag: tuple[str, ...], tagalong: tuple[str, ...]):
 
                 crud.tagalong.add(conn, source_id, target_id)
 
-def remove():
-    pass
+
+@tagalong.command(help="Remove tagalongs.")
+@click.option("-t", "--tag", required=True, multiple=True)
+@click.option("-ta", "--tagalong", required=True, multiple=True)
+@click.pass_obj
+def remove(vault: Connection, tag: tuple[str, ...], tagalong: tuple[str, ...]):
+    with vault as conn:
+        for source in tag:
+            source_record = crud.tag.get_tag_by_name(conn, source)
+
+            if not source_record:
+                continue
+
+            for target in tagalong:
+                target_record = crud.tag.get_tag_by_name(conn, target)
+
+                if not target_record:
+                    continue
+
+                crud.tagalong.remove(conn, source_record[0], target_record[0])
 
 
 @tagalong.command(help="Show all tagalongs.")
