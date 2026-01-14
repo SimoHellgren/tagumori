@@ -1,8 +1,6 @@
 import pytest
-from click.testing import CliRunner
-from filetags.src.models.vault import Vault
-from filetags.src.models.node import Node
 
+from filetags.models.node import Node
 
 test_data = {
     "entries": [
@@ -41,24 +39,6 @@ test_data = {
         ["scissors", "rock"],
     ],
 }
-
-
-@pytest.fixture
-def cli_runner(vault: Vault):
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        with open("vault.json", "w") as f:
-            f.write(vault.to_json())
-
-        yield runner
-
-
-@pytest.fixture
-def vault():
-    """Opens a vault with mocked data"""
-    vault = Vault.from_json(test_data)
-
-    return vault
 
 
 @pytest.fixture

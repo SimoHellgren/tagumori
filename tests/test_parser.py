@@ -1,4 +1,4 @@
-from filetags.src.parser import parse
+from filetags.parser import parse
 
 
 def test_empty():

@@ -1,5 +1,6 @@
 from click.testing import CliRunner
-from filetags.src.cli import cli
+
+from filetags.cli import cli
 
 
 def test_ls(cli_runner: CliRunner):

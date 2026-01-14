@@ -1,4 +1,4 @@
-from filetags.src.models.node import Node
+from filetags.models.node import Node
 
 
 def test_creation():
