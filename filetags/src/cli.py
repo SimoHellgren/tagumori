@@ -9,7 +9,7 @@ from filetags.src.db.connect import get_vault
 from filetags.src.db.init import init_db
 from filetags.src.models.node import Node
 from filetags.src.parser import parse
-from filetags.src.utils import flatten
+from filetags.src.utils import compile_pattern, flatten
 
 VAULT_PATH = Path("vault.db")
 
@@ -200,9 +200,23 @@ def drop(vault: Connection, files: tuple[int, ...], retain_file: bool):
 @click.option("-l", "long", type=click.BOOL, is_flag=True, help="Long listing format.")
 @click.option("-s", "select", multiple=True)
 @click.option("-e", "exclude", multiple=True)
+@click.option("-p", "--pattern", help="Filter output by regex pattern")
+@click.option("-i", "--ignore-case", is_flag=True)
+@click.option(
+    "-v",
+    "--invert-match",
+    is_flag=True,
+    help="Inverts the regex match (not select/exclude).",
+)
 @click.pass_obj
 def ls(
-    vault: Connection, long: bool, select: tuple[str, ...], exclude: tuple[str, ...]
+    vault: Connection,
+    long: bool,
+    select: tuple[str, ...],
+    exclude: tuple[str, ...],
+    pattern: str,
+    ignore_case: bool,
+    invert_match: bool,
 ):
     # parse nodes
     select_nodes = [parse(n) for n in select]
@@ -210,6 +224,8 @@ def ls(
 
     include_ids = set()
     exclude_ids = set()
+
+    regex = compile_pattern(pattern, ignore_case)
 
     with vault as conn:
         for n in select_nodes:
@@ -226,9 +242,22 @@ def ls(
 
             exclude_ids |= set.intersection(*matches)
 
-        files = crud.file.get_many(conn, list(include_ids - exclude_ids))
+        ids = list(include_ids - exclude_ids)
+
+        if ids:
+            files = crud.file.get_many(conn, ids)
+        else:
+            files = crud.file.get_all(conn)
 
         for file_id, path, *_ in files:
+            matched = bool(regex.search(path)) if regex else True
+
+            if invert_match:
+                matched = not matched
+
+            if not matched:
+                continue
+
             tags = crud.file_tag.get_file_tags(conn, file_id)
 
             roots = crud.file_tag.build_tree(tags)

@@ -1,10 +1,10 @@
-import re
 from sqlite3 import Connection
 from typing import Optional
 
 import click
 
 from filetags.src import crud
+from filetags.src.utils import compile_pattern
 
 
 @click.group(help="Tag management")
@@ -89,15 +89,6 @@ def remove_tag(vault: Connection, tags: tuple[str, ...]):
         for tag in tags:
             tag_id = crud.tag.get_tag_by_name(conn, tag)[0]
             crud.tag.delete_tag(conn, tag_id)
-
-
-def compile_pattern(pattern: str, ignore_case: bool):
-    if not pattern:
-        return None
-
-    flags = re.IGNORECASE if ignore_case else 0
-
-    return re.compile(pattern, flags)
 
 
 @tag.command(help="List tags", name="ls")
