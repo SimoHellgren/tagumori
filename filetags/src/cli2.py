@@ -198,11 +198,36 @@ def drop(vault: Connection, files: tuple[int, ...], retain_file: bool):
 
 @cli.command(help="List files (with optional filters).")
 @click.option("-l", "long", type=click.BOOL, is_flag=True, help="Long listing format.")
+@click.option("-s", "select", multiple=True)
+@click.option("-e", "exclude", multiple=True)
 @click.pass_obj
-def ls(vault: Connection, long: bool):
-    # right horrendeously inefficient
+def ls(
+    vault: Connection, long: bool, select: tuple[str, ...], exclude: tuple[str, ...]
+):
+    # parse nodes
+    select_nodes = [parse(n) for n in select]
+    exclude_nodes = [parse(n) for n in exclude]
+
+    include_ids = set()
+    exclude_ids = set()
+
     with vault as conn:
-        files = crud.file.get_all(conn)
+        for n in select_nodes:
+            matches = []
+            for _, *p in n.paths_down():
+                matches.append({x[0] for x in crud.file_tag.find_all(conn, p)})
+
+            include_ids |= set.intersection(*matches)
+
+        for n in exclude_nodes:
+            matches = []
+            for _, *p in n.paths_down():
+                matches.append({x[0] for x in crud.file_tag.find_all(conn, p)})
+
+            exclude_ids |= set.intersection(*matches)
+
+        files = crud.file.get_many(conn, list(include_ids - exclude_ids))
+
         for file_id, path, *_ in files:
             tags = crud.file_tag.get_file_tags(conn, file_id)
 

@@ -1,6 +1,7 @@
 from sqlite3 import Connection
 
 from filetags.src.models.node import Node
+from filetags.src.utils import flatten
 
 
 def resolve_path(conn: Connection, file_id: int, path: tuple[Node, ...]) -> int:
@@ -28,6 +29,49 @@ def resolve_path(conn: Connection, file_id: int, path: tuple[Node, ...]) -> int:
         parent_id = row[0]
 
     return parent_id
+
+
+def find_all(conn: Connection, path: tuple[Node, ...]) -> list:
+    values = ",".join("(?,?)" for _ in path)
+
+    q = f"""
+        WITH path(depth, tag_name) AS (
+            VALUES {values}
+        ),
+
+        match(file_id, id, depth) AS (
+            SELECT
+                file_tag.file_id,
+                file_tag.id,
+                1
+            FROM file_tag
+            JOIN tag ON tag.id = file_tag.tag_id
+            JOIN path
+                ON path.depth = 1
+                AND path.tag_name = tag.name
+
+            UNION ALL
+
+            SELECT
+                child.file_id,
+                child.id,
+                parent.depth + 1
+            FROM match parent
+            JOIN file_tag child
+                ON child.parent_id = parent.id
+                AND child.file_id = parent.file_id
+            JOIN tag ON child.tag_id = tag.id
+            JOIN path
+                ON path.depth = parent.depth + 1
+                AND path.tag_name = tag.name 
+        )
+
+        SELECT DISTINCT file_id FROM match 
+        WHERE depth = (SELECT MAX(depth) FROM path)
+    """
+    tags = (n.value for n in path)
+    res = conn.execute(q, tuple(flatten(enumerate(tags, 1)))).fetchall()
+    return res
 
 
 # TODO: consider if this belongs elsewhere or if should be "packaged" differently.

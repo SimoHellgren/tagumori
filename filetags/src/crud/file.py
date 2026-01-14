@@ -6,6 +6,13 @@ def get_by_name(conn: Connection, file: Path):
     return conn.execute("SELECT * FROM file WHERE path = ?", (file,)).fetchone()
 
 
+def get_many(conn: Connection, ids: list[int]) -> list:
+    phs = ",".join("?" for _ in ids)
+    return conn.execute(
+        f"SELECT * FROM file WHERE id in ({phs}) ORDER BY path", ids
+    ).fetchall()
+
+
 def get_or_create_file(conn: Connection, file: Path) -> int:
     q = """
             INSERT INTO file (path) VALUES (?)
