@@ -3,6 +3,7 @@ from sqlite3 import Connection
 
 from filetags import crud
 from filetags.models.node import Node
+from filetags.utils import flatten
 
 
 def attach_tree(
@@ -40,3 +41,28 @@ def remove_tags_from_files(conn: Connection, files: list[Path], tags: list[Node]
                 file_tag_id = crud.file_tag.resolve_path(conn, file_id, path)
                 if file_tag_id:
                     crud.file_tag.detach(conn, file_tag_id)
+
+
+def set_tags_on_files(
+    conn: Connection, files: list[Path], tag: Node, apply_tagalongs: bool = True
+):
+    # remove unwanted paths
+    _, *nodes = tag.preorder()
+    desired_paths = set(tuple(n.path()[1:]) for n in nodes)
+
+    file_ids = [x["id"] for x in crud.file.get_or_create_many(conn, files)]
+
+    for file_id in file_ids:
+        tags = crud.file_tag.get_by_file_id(conn, file_id)
+
+        roots = crud.file_tag.build_tree(tags)
+        db_nodes = flatten(n.preorder() for n in roots)
+        existing_paths = set(n.path() for n in db_nodes)
+
+        paths_to_delete = existing_paths - desired_paths
+        for path in paths_to_delete:
+            file_tag_id = crud.file_tag.resolve_path(conn, file_id, path)
+            crud.file_tag.detach(conn, file_tag_id)
+
+    # attach new tags - done after removal so new tagalongs aren't nuked.
+    add_tags_to_files(conn, files, tag.children, apply_tagalongs)

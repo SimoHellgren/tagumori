@@ -122,32 +122,20 @@ def show(vault: Connection, files: tuple[Path, ...]):
     multiple=True,
 )
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
+@click.option(
+    "--tagalongs/--no-tagalongs",
+    type=click.BOOL,
+    default=True,
+    help="Apply / don't apply tagalongs.",
+)
 @click.pass_obj
-def set_(vault: Connection, files: tuple[Path, ...], tags: tuple[str, ...]):
+def set_(
+    vault: Connection, files: tuple[Path, ...], tags: tuple[str, ...], tagalongs: bool
+):
     root = Node("root", list(flatten(parse(t).children for t in tags)))
-    _, *nodes = root.preorder()
-
-    desired_paths = set(tuple(n.path()[1:]) for n in nodes)
 
     with vault as conn:
-        for file in files:
-            file_id = crud.file.get_or_create(conn, file)
-
-            # attach new tags
-            for node in root.children:
-                service.attach_tree(conn, file_id, node)
-
-            # remove other tags
-            tags = crud.file_tag.get_by_file_id(conn, file_id)
-
-            roots = crud.file_tag.build_tree(tags)
-            db_nodes = flatten(n.preorder() for n in roots)
-            existing_paths = set(n.path() for n in db_nodes)
-
-            paths_to_delete = existing_paths - desired_paths
-            for path in paths_to_delete:
-                file_tag_id = crud.file_tag.resolve_path(conn, file_id, path)
-                crud.file_tag.detach(conn, file_tag_id)
+        service.set_tags_on_files(conn, files, root, tagalongs)
 
 
 @cli.command(help="Drop files' tags")
