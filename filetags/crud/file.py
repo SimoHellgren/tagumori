@@ -13,7 +13,7 @@ def get_many_by_path(conn: Connection, paths: list[Path]) -> list[Row]:
     ).fetchall()
 
 
-def get_many(conn: Connection, ids: list[int]) -> list:
+def get_many(conn: Connection, ids: list[int]) -> list[Row]:
     phs = ",".join("?" for _ in ids)
     return conn.execute(
         f"SELECT * FROM file WHERE id in ({phs}) ORDER BY path", ids
@@ -42,7 +42,7 @@ def get_or_create_many(conn: Connection, paths: list[Path]) -> list[Row]:
     return conn.execute(q, [*map(str, paths)]).fetchall()
 
 
-def get_all(conn: Connection):
+def get_all(conn: Connection) -> list[Row]:
     return conn.execute("SELECT * FROM file ORDER BY path").fetchall()
 
 

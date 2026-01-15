@@ -190,32 +190,10 @@ def ls(
     select_nodes = [parse(n) for n in select]
     exclude_nodes = [parse(n) for n in exclude]
 
-    include_ids = set()
-    exclude_ids = set()
-
     regex = compile_pattern(pattern, ignore_case)
 
     with vault as conn:
-        for n in select_nodes:
-            matches = []
-            for _, *p in n.paths_down():
-                matches.append({x[0] for x in crud.file_tag.find_all(conn, p)})
-
-            include_ids |= set.intersection(*matches)
-
-        for n in exclude_nodes:
-            matches = []
-            for _, *p in n.paths_down():
-                matches.append({x[0] for x in crud.file_tag.find_all(conn, p)})
-
-            exclude_ids |= set.intersection(*matches)
-
-        ids = list(include_ids - exclude_ids)
-
-        if ids:
-            files = crud.file.get_many(conn, ids)
-        else:
-            files = crud.file.get_all(conn)
+        files = service.search_files(conn, select_nodes, exclude_nodes)
 
         for file_id, path, *_ in files:
             matched = bool(regex.search(path)) if regex else True

@@ -66,3 +66,32 @@ def set_tags_on_files(
 
     # attach new tags - done after removal so new tagalongs aren't nuked.
     add_tags_to_files(conn, files, tag.children, apply_tagalongs)
+
+
+def search_files(conn: Connection, select_tags: list[Node], exclude_tags: list[Node]):
+    include_ids = set()
+    exclude_ids = set()
+
+    # TODO: refactor
+    for n in select_tags:
+        matches = []
+        for _, *p in n.paths_down():
+            matches.append({x[0] for x in crud.file_tag.find_all(conn, p)})
+
+        include_ids |= set.intersection(*matches)
+
+    for n in exclude_tags:
+        matches = []
+        for _, *p in n.paths_down():
+            matches.append({x[0] for x in crud.file_tag.find_all(conn, p)})
+
+        exclude_ids |= set.intersection(*matches)
+
+    ids = tuple(include_ids - exclude_ids)
+
+    if ids:
+        files = crud.file.get_many(conn, ids)
+    else:
+        files = crud.file.get_all(conn)
+
+    return files
