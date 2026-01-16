@@ -93,7 +93,7 @@ def remove_tag(vault: Connection, tags: tuple[str, ...]):
 
 @tag.command(help="List tags", name="ls")
 @click.option("-l", "long", type=click.BOOL, is_flag=True, help="Long listing format.")
-@click.option("-p", "--pattern", help="Filter output by regex pattern")
+@click.option("-p", "--pattern", help="Filter output by regex pattern", default=r".*")
 @click.option("-i", "--ignore-case", is_flag=True)
 @click.option("-v", "--invert-match", is_flag=True)
 @click.pass_obj
@@ -109,11 +109,7 @@ def list_tags(
 
     regex = compile_pattern(pattern, ignore_case)
 
-    for i, name, category in tags:
-        matched = bool(regex.search(name)) if regex else True
+    filtered = [t for t in tags if bool(regex.search(t["name"])) ^ invert_match]
 
-        if invert_match:
-            matched = not matched
-
-        if matched:
-            click.echo(name + (f" ({category})" if long else ""))
+    for tag in filtered:
+        click.echo(tag["name"] + (f" ({tag['category']})" if long else ""))
