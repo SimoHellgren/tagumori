@@ -33,7 +33,7 @@ def add_tags_to_files(
 
 def remove_tags_from_files(conn: Connection, files: list[Path], tags: list[Node]):
     # non-existing files are skipped here due to how get_many_by_path works.
-    file_ids = [x["id"] for x in crud.file.get_many_by_path(conn, files)]
+    file_ids = [x["id"] for x in crud.file.file.get_many_by_path(conn, files)]
 
     for file_id in file_ids:
         for tag in tags:
@@ -88,17 +88,17 @@ def set_tags_on_files(
 
 
 def drop_file_tags(conn: Connection, files: list[Path], retain_file: bool = False):
-    file_ids = [x["id"] for x in crud.file.get_many_by_path(conn, files)]
+    file_ids = [x["id"] for x in crud.file.file.get_many_by_path(conn, files)]
     for file_id in file_ids:
         crud.file_tag.drop_for_file(conn, file_id)
 
         if not retain_file:
-            crud.file.delete(conn, file_id)
+            crud.file.file.delete(conn, file_id)
 
 
 def get_files_with_tags(conn: Connection, files: list[Path]) -> dict[Path, list[Node]]:
     # TODO: turn into a proper batch get
-    file_records = crud.file.get_many_by_path(conn, files)
+    file_records = crud.file.file.get_many_by_path(conn, files)
     file_names = [f["path"] for f in file_records]
     tags = [crud.file_tag.get_by_file_id(conn, file["id"]) for file in file_records]
     roots = [build_tree(tag) for tag in tags]
@@ -125,14 +125,15 @@ def search_files(conn: Connection, select_tags: list[Node], exclude_tags: list[N
 
     # TODO: this is a dumb way to handle the case where the user provides only exclude tags
     if not include_ids:
-        include_ids = set(x["id"] for x in crud.file.get_all(conn))
+        include_ids = set(x["id"] for x in crud.file.file.get_all(conn))
 
     ids = tuple(include_ids - exclude_ids)
 
-    files = crud.file.get_many(conn, ids)
+    files = crud.file.file.get_many(conn, ids)
 
-    return files
+    return sorted(files, key=lambda x: x["path"])
 
 
 def get_all_files(conn: Connection) -> list[Row]:
-    return crud.file.get_all(conn)
+    files = crud.file.file.get_all(conn)
+    return sorted(files, key=lambda x: x["path"])
