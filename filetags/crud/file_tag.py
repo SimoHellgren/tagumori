@@ -5,6 +5,9 @@ from filetags.utils import flatten
 
 
 def resolve_path(conn: Connection, file_id: int, path: tuple[Node, ...]) -> int:
+    """Finds the lowest node of a path and returns file_tag.id if said path exists for file."""
+    # TODO: this could probably be implemented as a special case of find_all, or at
+    # least utilize similar recursive logic.
     parent_id = None
     for node in path:
         row = conn.execute(
@@ -70,29 +73,7 @@ def find_all(conn: Connection, path: tuple[Node, ...]) -> list[Row]:
         WHERE depth = (SELECT MAX(depth) FROM path)
     """
     tags = (n.value for n in path)
-    res = conn.execute(q, tuple(flatten(enumerate(tags, 1)))).fetchall()
-    return res
-
-
-# TODO: consider if this belongs elsewhere or if should be "packaged" differently.
-# As it stands, this is rather coupled with get_files_tags
-def build_tree(file_tags: list) -> list[Node]:
-    roots: list[Node] = []
-    nodes: dict[str | None, Node] = {}
-
-    # construct nodes
-    for id_, tag, parent_id in file_tags:
-        nodes[id_] = Node(value=tag)
-
-    # add children & record root nodes
-    for id_, _, parent_id in file_tags:
-        node = nodes[id_]
-        if parent_id is None:
-            roots.append(node)
-        else:
-            nodes[parent_id].add_child(node)
-
-    return roots
+    return conn.execute(q, tuple(flatten(enumerate(tags, 1)))).fetchall()
 
 
 def get_by_file_id(conn: Connection, file_id: int) -> list[Row]:

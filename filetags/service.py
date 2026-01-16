@@ -43,6 +43,25 @@ def remove_tags_from_files(conn: Connection, files: list[Path], tags: list[Node]
                     crud.file_tag.detach(conn, file_tag_id)
 
 
+def build_tree(file_tags: list) -> list[Node]:
+    roots: list[Node] = []
+    nodes: dict[str | None, Node] = {}
+
+    # construct nodes
+    for id_, tag, parent_id in file_tags:
+        nodes[id_] = Node(value=tag)
+
+    # add children & record root nodes
+    for id_, _, parent_id in file_tags:
+        node = nodes[id_]
+        if parent_id is None:
+            roots.append(node)
+        else:
+            nodes[parent_id].add_child(node)
+
+    return roots
+
+
 def set_tags_on_files(
     conn: Connection, files: list[Path], tag: Node, apply_tagalongs: bool = True
 ):
@@ -55,7 +74,7 @@ def set_tags_on_files(
     for file_id in file_ids:
         tags = crud.file_tag.get_by_file_id(conn, file_id)
 
-        roots = crud.file_tag.build_tree(tags)
+        roots = build_tree(tags)
         db_nodes = flatten(n.preorder() for n in roots)
         existing_paths = set(n.path() for n in db_nodes)
 
@@ -82,7 +101,7 @@ def get_files_with_tags(conn: Connection, files: list[Path]) -> dict[Path, list[
     file_records = crud.file.get_many_by_path(conn, files)
     file_names = [f["path"] for f in file_records]
     tags = [crud.file_tag.get_by_file_id(conn, file["id"]) for file in file_records]
-    roots = [crud.file_tag.build_tree(tag) for tag in tags]
+    roots = [build_tree(tag) for tag in tags]
 
     return dict(zip(file_names, roots))
 
