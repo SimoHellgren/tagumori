@@ -24,7 +24,7 @@ class FileCRUD(BaseCRUD):
             """
         return conn.execute(q, (str(path),)).fetchone()
 
-    def get_or_create_many(conn: Connection, paths: list[Path]) -> list[Row]:
+    def get_or_create_many(self, conn: Connection, paths: list[Path]) -> list[Row]:
         vals = _placeholders(len(paths), "(?)")
         q = f"""
                 INSERT INTO file (path) VALUES {vals}

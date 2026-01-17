@@ -22,7 +22,7 @@ class BaseCRUD:
             f"SELECT * FROM {self.table} WHERE id = ?", (id,)
         ).fetchone()
 
-    def get_many(self, conn: Connection, ids: Sequence[int]) -> Row:
+    def get_many(self, conn: Connection, ids: Sequence[int]) -> list[Row]:
         phs = _placeholders(len(ids))
 
         return conn.execute(

@@ -1,6 +1,5 @@
 from collections.abc import Sequence
 from sqlite3 import Connection, Row
-from typing import Optional
 
 from filetags.crud.base import BaseCRUD, _placeholders
 
@@ -15,9 +14,7 @@ class TagCRUD(BaseCRUD):
     def get_many_by_name(self, conn: Connection, names: Sequence[str]) -> list[Row]:
         return self.get_many_by_unique_col(conn, names)
 
-    def create(
-        self, conn: Connection, name: str, category: Optional[str] = None
-    ) -> Row:
+    def create(self, conn: Connection, name: str, category: str | None = None) -> Row:
         return conn.execute(
             "INSERT INTO tag(name, category) VALUES (?, ?) RETURNING *",
             (name, category),

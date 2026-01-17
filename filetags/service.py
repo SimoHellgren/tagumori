@@ -9,8 +9,8 @@ from filetags.utils import flatten
 def attach_tree(
     conn: Connection, file_id: int, node: Node, parent_id: int | None = None
 ):
-    tag_id = crud.tag.get_or_create(conn, node.value)
-    filetag_id = crud.file_tag.attach(conn, file_id, tag_id, parent_id)
+    tag = crud.tag.get_or_create(conn, node.value)
+    filetag_id = crud.file_tag.attach(conn, file_id, tag["id"], parent_id)
     for child in node.children:
         attach_tree(conn, file_id, child, filetag_id)
 
