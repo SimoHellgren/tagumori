@@ -1,22 +1,22 @@
-from sqlite3 import Connection
+from sqlite3 import Connection, Row
 from typing import Iterable
 
 
-def add(conn: Connection, source_id: int, target_id: int):
+def create(conn: Connection, source_id: int, target_id: int) -> None:
     conn.execute(
         "INSERT OR IGNORE INTO tagalong(tag_id, tagalong_id) VALUES (?,?)",
         (source_id, target_id),
     )
 
 
-def remove(conn: Connection, source_id: int, target_id: int):
+def delete(conn: Connection, source_id: int, target_id: int) -> None:
     conn.execute(
         "DELETE FROM tagalong WHERE tag_id = ? AND tagalong_id = ?",
         (source_id, target_id),
     )
 
 
-def get_all_names(conn: Connection):
+def get_all_names(conn: Connection) -> list[Row]:
     result = conn.execute("""
         SELECT t.name, ta.name
         FROM tagalong
@@ -28,7 +28,7 @@ def get_all_names(conn: Connection):
     return result
 
 
-def apply(conn: Connection, file_ids: Iterable[int] | None = None):
+def apply(conn: Connection, file_ids: Iterable[int] | None = None) -> None:
     # TODO: consider allowing tag filtering
     q = """
         WITH RECURSIVE implied(tag_id, tagalong_id) AS (

@@ -23,7 +23,7 @@ def add(vault: Connection, tag: tuple[str, ...], tagalong: tuple[str, ...]):
         targets = crud.tag.get_or_create_many(conn, tagalong)
 
         for source, target in product(sources, targets):
-            crud.tagalong.add(conn, source["id"], target["id"])
+            crud.tagalong.create(conn, source["id"], target["id"])
 
 
 @tagalong.command(help="Remove tagalongs.")
@@ -36,7 +36,7 @@ def remove(vault: Connection, tag: tuple[str, ...], tagalong: tuple[str, ...]):
         targets = crud.tag.get_many_by_name(conn, tagalong)
 
         for source, target in product(sources, targets):
-            crud.tagalong.remove(conn, source["id"], target["id"])
+            crud.tagalong.delete(conn, source["id"], target["id"])
 
 
 @tagalong.command(help="Show all tagalongs.")
