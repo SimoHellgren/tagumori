@@ -53,8 +53,3 @@ def nodes() -> list[Node]:
     n8 = Node(8, parent=n7)  # leaf
 
     return [n1, n2, n3, n4, n5, n6, n7, n8]
-
-
-@pytest.fixture
-def tree(nodes: list[Node]) -> Node:
-    return nodes[0]
