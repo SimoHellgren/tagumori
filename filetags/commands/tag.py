@@ -67,13 +67,13 @@ def edit_tag(vault: Connection, tag: list[str], clear_category: bool, **kwargs):
 @click.pass_obj
 def replace_tag(vault: Connection, old: tuple[str, ...], new: str, remove: bool):
     with vault as conn:
-        new_id = crud.tag.get_by_name(conn, new)[0]
-        for tag in old:
-            old_id = crud.tag.get_by_name(conn, tag)[0]
-            crud.file_tag.replace(conn, old_id, new_id)
+        new_record = crud.tag.get_or_create(conn, new)
+        olds = crud.tag.get_many_by_name(conn, old)
+        for old_record in olds:
+            crud.file_tag.replace(conn, old_record["id"], new_record["id"])
 
             if remove:
-                crud.tag.delete(conn, old_id)
+                crud.tag.delete(conn, old_record["id"])
 
 
 @tag.command(help="Removes all instances of a tag.", name="delete")

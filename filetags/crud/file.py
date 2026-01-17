@@ -2,7 +2,7 @@ from pathlib import Path
 from sqlite3 import Connection, Row
 from typing import Sequence
 
-from filetags.crud.base import BaseCRUD
+from filetags.crud.base import BaseCRUD, _placeholders
 
 
 class FileCRUD(BaseCRUD):
@@ -25,7 +25,7 @@ class FileCRUD(BaseCRUD):
         return conn.execute(q, (str(path),)).fetchone()
 
     def get_or_create_many(conn: Connection, paths: list[Path]) -> list[Row]:
-        vals = ",".join("(?)" for _ in paths)
+        vals = _placeholders(len(paths), "(?)")
         q = f"""
                 INSERT INTO file (path) VALUES {vals}
                 ON CONFLICT(path) DO UPDATE SET path=path --no-op update
