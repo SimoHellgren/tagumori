@@ -176,10 +176,7 @@ class Node(Generic[T]):
         return f"{self.value}" + (f"[{children}]" if children else "")
 
     def __repr__(self) -> str:
-        return f"Node({self.value})"
-
-    def __json__(self):
-        return {"name": self.value, "children": self.children}
+        return f"Node({self.value!r})"
 
     def is_rooted_subtree(self, other: Self) -> bool:
         """Checks if structure of self is found in other. Must match also at root.
@@ -224,4 +221,5 @@ class Node(Generic[T]):
         return self.value == other.value
 
     def __hash__(self):
+        # this is not perhaps the best choice, but works for now
         return hash(self.value)

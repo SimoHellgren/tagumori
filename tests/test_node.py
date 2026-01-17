@@ -66,6 +66,7 @@ def test_siblings():
     n3 = Node("3", parent=n1)
     n4 = Node("4", parent=n1)
 
+    assert not n1.siblings()
     assert n1 not in n2.siblings()
     assert n2 not in n2.siblings()
     assert n3 in n2.siblings()
@@ -140,10 +141,13 @@ def test_descendants(nodes: list[Node]):
 
 
 def test_root(nodes: list[Node]):
-    tree = nodes[0]
+    root = nodes[0]
 
-    for node in tree.preorder():
-        assert node.root is tree
+    assert root.is_root
+
+    # test that "root" is the root for all children
+    for node in root.preorder():
+        assert node.root is root
 
 
 def test_leaves(nodes: list[Node]):
@@ -356,3 +360,43 @@ def test_merge_overlap():
     a.merge(b)
 
     assert sorted(n.value for n in a.children) == ["a", "b", "c"]
+
+
+def test_merge_fail():
+    a = Node("A", [Node("a"), Node("b")])
+    b = Node("B", [Node("b"), Node("c")])
+
+    a.merge(b)
+
+    # nothing should change
+    assert sorted(n.value for n in a.children) == ["a", "b"]
+    assert sorted(n.value for n in b.children) == ["b", "c"]
+
+
+def test_str():
+    tree = Node("A", [Node("B", [Node("C")]), Node("D")])
+
+    assert str(tree) == "A[B[C],D]"
+
+
+def test_repr():
+    tree = Node("A", [Node("B", [Node("C")]), Node("D")])
+
+    assert repr(tree) == "Node('A')"
+
+
+def test_hash():
+    a1 = Node("A", [Node("b"), Node("c")])
+    a2 = Node("A", [Node("c"), Node("d")])
+
+    b = Node("B")
+
+    # hash should be consistent
+    assert hash(a1) == hash(a1)
+
+    # hash is only dependent on node.value, not children
+    # (silly as it may be)
+    assert hash(a1) == hash(a2)
+
+    # hash is different for different values
+    assert hash(a1) != hash(b)
