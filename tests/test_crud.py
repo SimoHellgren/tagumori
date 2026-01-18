@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from filetags import crud
+from filetags.crud.file import _get_inode_and_device
 
 
 class TestTagCRUD:
@@ -130,6 +131,23 @@ class TestTagCRUD:
 
 
 class TestFileCRUD:
+    def test_inode_utility_real_file(self, tmp_path):
+        file = tmp_path / "real.txt"
+        file.touch()  # touch to make it real
+
+        inode, device = _get_inode_and_device(file)
+
+        assert inode is not None
+        assert device is not None
+
+    def test_inode_utility_fake_file(self):
+        file = Path("fake.txt")
+
+        inode, device = _get_inode_and_device(file)
+
+        assert inode is None
+        assert device is None
+
     def test_get_or_create(self, conn):
         row = crud.file.get_or_create(conn, Path("foo.txt"))
 
