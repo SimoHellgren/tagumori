@@ -309,3 +309,306 @@ class TestTagalong:
         rows = crud.file_tag.get_by_file_id(conn, file_row["id"])
         tag_names = {r["name"] for r in rows}
         assert tag_names == {"A", "B", "C"}
+
+    def test_circular_tagalong_two_nodes(self, conn):
+        """A -> B -> A should not loop infinitely."""
+        a = crud.tag.create(conn, "A")
+        b = crud.tag.create(conn, "B")
+
+        crud.tagalong.create(conn, a["id"], b["id"])
+        crud.tagalong.create(conn, b["id"], a["id"])
+
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        crud.file_tag.attach(conn, file_row["id"], a["id"])
+
+        # Should complete without hanging
+        crud.tagalong.apply(conn, [file_row["id"]])
+
+        rows = crud.file_tag.get_by_file_id(conn, file_row["id"])
+        tag_names = {r["name"] for r in rows}
+        assert tag_names == {"A", "B"}
+
+    def test_circular_tagalong_three_nodes(self, conn):
+        """A -> B -> C -> A should not loop infinitely."""
+        a = crud.tag.create(conn, "A")
+        b = crud.tag.create(conn, "B")
+        c = crud.tag.create(conn, "C")
+
+        crud.tagalong.create(conn, a["id"], b["id"])
+        crud.tagalong.create(conn, b["id"], c["id"])
+        crud.tagalong.create(conn, c["id"], a["id"])
+
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        crud.file_tag.attach(conn, file_row["id"], a["id"])
+
+        # Should complete without hanging
+        crud.tagalong.apply(conn, [file_row["id"]])
+
+        rows = crud.file_tag.get_by_file_id(conn, file_row["id"])
+        tag_names = {r["name"] for r in rows}
+        assert tag_names == {"A", "B", "C"}
+
+    def test_self_referential_tagalong(self, conn):
+        """A -> A should not cause issues."""
+        a = crud.tag.create(conn, "A")
+
+        crud.tagalong.create(conn, a["id"], a["id"])
+
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        crud.file_tag.attach(conn, file_row["id"], a["id"])
+
+        # Should complete without hanging
+        crud.tagalong.apply(conn, [file_row["id"]])
+
+        rows = crud.file_tag.get_by_file_id(conn, file_row["id"])
+        tag_names = {r["name"] for r in rows}
+        assert tag_names == {"A"}
+
+
+class TestCascadeDeletes:
+    """Test that foreign key cascades work correctly."""
+
+    def test_delete_file_cascades_to_file_tag(self, conn):
+        """Deleting a file should delete its file_tags."""
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        tag_row = crud.tag.create(conn, "rock")
+        crud.file_tag.attach(conn, file_row["id"], tag_row["id"])
+
+        crud.file.delete(conn, file_row["id"])
+
+        # file_tag should be gone
+        rows = conn.execute("SELECT * FROM file_tag").fetchall()
+        assert rows == []
+
+    def test_delete_tag_cascades_to_file_tag(self, conn):
+        """Deleting a tag should delete its file_tags."""
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        tag_row = crud.tag.create(conn, "rock")
+        crud.file_tag.attach(conn, file_row["id"], tag_row["id"])
+
+        crud.tag.delete(conn, tag_row["id"])
+
+        # file_tag should be gone
+        rows = crud.file_tag.get_by_file_id(conn, file_row["id"])
+        assert rows == []
+        # file should still exist
+        assert crud.file.get_by_path(conn, Path("test.txt")) is not None
+
+    def test_delete_tag_cascades_to_tagalong(self, conn):
+        """Deleting a tag should delete its tagalong relationships."""
+        t1 = crud.tag.create(conn, "rock")
+        t2 = crud.tag.create(conn, "guitar")
+        crud.tagalong.create(conn, t1["id"], t2["id"])
+
+        crud.tag.delete(conn, t1["id"])
+
+        rows = crud.tagalong.get_all_names(conn)
+        assert rows == []
+
+    def test_delete_parent_file_tag_cascades_to_children(self, conn):
+        """Deleting a parent file_tag should delete its children."""
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        parent_tag = crud.tag.create(conn, "genre")
+        child_tag = crud.tag.create(conn, "rock")
+        grandchild_tag = crud.tag.create(conn, "classic")
+
+        parent_ft_id = crud.file_tag.attach(conn, file_row["id"], parent_tag["id"])
+        child_ft_id = crud.file_tag.attach(
+            conn, file_row["id"], child_tag["id"], parent_ft_id
+        )
+        crud.file_tag.attach(conn, file_row["id"], grandchild_tag["id"], child_ft_id)
+
+        # Delete parent - should cascade to child and grandchild
+        crud.file_tag.detach(conn, parent_ft_id)
+
+        rows = crud.file_tag.get_by_file_id(conn, file_row["id"])
+        assert rows == []
+
+    def test_delete_child_file_tag_preserves_parent(self, conn):
+        """Deleting a child file_tag should preserve the parent."""
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        parent_tag = crud.tag.create(conn, "genre")
+        child_tag = crud.tag.create(conn, "rock")
+
+        parent_ft_id = crud.file_tag.attach(conn, file_row["id"], parent_tag["id"])
+        child_ft_id = crud.file_tag.attach(
+            conn, file_row["id"], child_tag["id"], parent_ft_id
+        )
+
+        crud.file_tag.detach(conn, child_ft_id)
+
+        rows = crud.file_tag.get_by_file_id(conn, file_row["id"])
+        assert len(rows) == 1
+        assert rows[0]["name"] == "genre"
+
+    def test_delete_child_file_tag_cascades_to_grandchildren(self, conn):
+        """Deleting a child file_tag should delete its children but preserve parent."""
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        parent_tag = crud.tag.create(conn, "genre")
+        child_tag = crud.tag.create(conn, "rock")
+        grandchild_tag = crud.tag.create(conn, "classic")
+
+        parent_ft_id = crud.file_tag.attach(conn, file_row["id"], parent_tag["id"])
+        child_ft_id = crud.file_tag.attach(
+            conn, file_row["id"], child_tag["id"], parent_ft_id
+        )
+        crud.file_tag.attach(conn, file_row["id"], grandchild_tag["id"], child_ft_id)
+
+        # Delete child - should cascade to grandchild but preserve parent
+        crud.file_tag.detach(conn, child_ft_id)
+
+        rows = crud.file_tag.get_by_file_id(conn, file_row["id"])
+        assert len(rows) == 1
+        assert rows[0]["name"] == "genre"
+
+
+class TestFileTagPaths:
+    """Tests for resolve_path and find_all."""
+
+    from filetags.models.node import Node
+
+    @pytest.fixture
+    def file_with_tag_tree(self, conn):
+        """
+        Creates a file with tag tree: genre -> rock -> classic
+        """
+        file_row = crud.file.get_or_create(conn, Path("song.mp3"))
+        genre = crud.tag.create(conn, "genre")
+        rock = crud.tag.create(conn, "rock")
+        classic = crud.tag.create(conn, "classic")
+
+        genre_ft = crud.file_tag.attach(conn, file_row["id"], genre["id"])
+        rock_ft = crud.file_tag.attach(conn, file_row["id"], rock["id"], genre_ft)
+        classic_ft = crud.file_tag.attach(conn, file_row["id"], classic["id"], rock_ft)
+
+        return {
+            "file_id": file_row["id"],
+            "file_tag_ids": {"genre": genre_ft, "rock": rock_ft, "classic": classic_ft},
+        }
+
+    def test_resolve_path_full(self, conn, file_with_tag_tree):
+        """resolve_path returns the file_tag id of the last node in the path."""
+        from filetags.models.node import Node
+
+        file_id = file_with_tag_tree["file_id"]
+        path = (Node("genre"), Node("rock"), Node("classic"))
+
+        result = crud.file_tag.resolve_path(conn, file_id, path)
+
+        assert result == file_with_tag_tree["file_tag_ids"]["classic"]
+
+    def test_resolve_path_partial(self, conn, file_with_tag_tree):
+        """resolve_path works for partial paths."""
+        from filetags.models.node import Node
+
+        file_id = file_with_tag_tree["file_id"]
+        path = (Node("genre"), Node("rock"))
+
+        result = crud.file_tag.resolve_path(conn, file_id, path)
+
+        assert result == file_with_tag_tree["file_tag_ids"]["rock"]
+
+    def test_resolve_path_root_only(self, conn, file_with_tag_tree):
+        """resolve_path works for root-only path."""
+        from filetags.models.node import Node
+
+        file_id = file_with_tag_tree["file_id"]
+        path = (Node("genre"),)
+
+        result = crud.file_tag.resolve_path(conn, file_id, path)
+
+        assert result == file_with_tag_tree["file_tag_ids"]["genre"]
+
+    def test_resolve_path_not_found(self, conn, file_with_tag_tree):
+        """resolve_path returns None if path doesn't exist."""
+        from filetags.models.node import Node
+
+        file_id = file_with_tag_tree["file_id"]
+        path = (Node("genre"), Node("jazz"))  # jazz doesn't exist
+
+        result = crud.file_tag.resolve_path(conn, file_id, path)
+
+        assert result is None
+
+    def test_resolve_path_wrong_order(self, conn, file_with_tag_tree):
+        """resolve_path returns None if path is in wrong order."""
+        from filetags.models.node import Node
+
+        file_id = file_with_tag_tree["file_id"]
+        path = (Node("rock"), Node("genre"))  # wrong order
+
+        result = crud.file_tag.resolve_path(conn, file_id, path)
+
+        assert result is None
+
+    def test_resolve_path_empty(self, conn, file_with_tag_tree):
+        """resolve_path with empty path returns None."""
+        file_id = file_with_tag_tree["file_id"]
+
+        result = crud.file_tag.resolve_path(conn, file_id, ())
+
+        assert result is None
+
+    def test_find_all_single_file(self, conn, file_with_tag_tree):
+        """find_all returns file_ids matching the path."""
+        from filetags.models.node import Node
+
+        path = [Node("genre"), Node("rock")]
+
+        result = crud.file_tag.find_all(conn, path)
+
+        file_ids = {r["file_id"] for r in result}
+        assert file_ids == {file_with_tag_tree["file_id"]}
+
+    def test_find_all_multiple_files(self, conn):
+        """find_all returns all files matching the path."""
+        from filetags.models.node import Node
+
+        # Create two files with same tag path
+        file1 = crud.file.get_or_create(conn, Path("song1.mp3"))
+        file2 = crud.file.get_or_create(conn, Path("song2.mp3"))
+        rock = crud.tag.create(conn, "rock")
+
+        crud.file_tag.attach(conn, file1["id"], rock["id"])
+        crud.file_tag.attach(conn, file2["id"], rock["id"])
+
+        path = [Node("rock")]
+        result = crud.file_tag.find_all(conn, path)
+
+        file_ids = {r["file_id"] for r in result}
+        assert file_ids == {file1["id"], file2["id"]}
+
+    def test_find_all_no_match(self, conn, file_with_tag_tree):
+        """find_all returns empty list if no files match."""
+        from filetags.models.node import Node
+
+        path = [Node("jazz")]
+
+        result = crud.file_tag.find_all(conn, path)
+
+        assert result == []
+
+    def test_find_all_filters_by_full_path(self, conn):
+        """find_all only matches files with the complete path."""
+        from filetags.models.node import Node
+
+        # file1: genre -> rock
+        # file2: genre -> jazz
+        file1 = crud.file.get_or_create(conn, Path("rock.mp3"))
+        file2 = crud.file.get_or_create(conn, Path("jazz.mp3"))
+        genre = crud.tag.create(conn, "genre")
+        rock = crud.tag.create(conn, "rock")
+        jazz = crud.tag.create(conn, "jazz")
+
+        genre_ft1 = crud.file_tag.attach(conn, file1["id"], genre["id"])
+        crud.file_tag.attach(conn, file1["id"], rock["id"], genre_ft1)
+
+        genre_ft2 = crud.file_tag.attach(conn, file2["id"], genre["id"])
+        crud.file_tag.attach(conn, file2["id"], jazz["id"], genre_ft2)
+
+        # Search for genre -> rock should only find file1
+        path = [Node("genre"), Node("rock")]
+        result = crud.file_tag.find_all(conn, path)
+
+        file_ids = {r["file_id"] for r in result}
+        assert file_ids == {file1["id"]}
