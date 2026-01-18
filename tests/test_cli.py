@@ -236,6 +236,66 @@ class TestLs:
         assert result.exit_code == 0
         assert "sample.txt" in result.output
 
+    def test_ls_relative_to(self, runner, vault, tmp_path):
+        """--relative-to should display paths relative to the given directory."""
+        subdir = tmp_path / "subdir"
+        subdir.mkdir()
+        file = subdir / "nested.txt"
+        file.write_text("content")
+
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(file), "-t", "rock"]
+        )
+
+        result = runner.invoke(
+            cli, ["--vault", str(vault), "ls", "--relative-to", str(tmp_path)]
+        )
+
+        assert result.exit_code == 0
+        # Should show relative path, not absolute
+        assert "subdir/nested.txt" in result.output or "subdir\\nested.txt" in result.output
+        assert str(tmp_path) not in result.output
+
+    def test_ls_relative_to_cwd(self, runner, vault, tmp_path):
+        """--relative-to . should work relative to current directory."""
+        file = tmp_path / "file.txt"
+        file.write_text("content")
+
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(file), "-t", "rock"]
+        )
+
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                cli, ["--vault", str(vault), "ls", "--relative-to", "."]
+            )
+
+            assert result.exit_code == 0
+            assert "file.txt" in result.output
+
+    def test_ls_relative_to_file_outside_base(self, runner, vault, tmp_path):
+        """Files outside the base path should show absolute path or error gracefully."""
+        other_dir = tmp_path / "other"
+        other_dir.mkdir()
+        file = other_dir / "outside.txt"
+        file.write_text("content")
+
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(file), "-t", "rock"]
+        )
+
+        # Try to show relative to a different directory
+        base_dir = tmp_path / "base"
+        base_dir.mkdir()
+
+        result = runner.invoke(
+            cli, ["--vault", str(vault), "ls", "--relative-to", str(base_dir)]
+        )
+
+        # Should either show absolute path or handle gracefully (not crash)
+        assert result.exit_code == 0
+        assert "outside.txt" in result.output
+
     def test_ls_long_format(self, runner, vault, sample_file):
         runner.invoke(
             cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]

@@ -99,7 +99,7 @@ def drop_file_tags(conn: Connection, files: list[Path], retain_file: bool = Fals
 def get_files_with_tags(conn: Connection, files: list[Path]) -> dict[Path, list[Node]]:
     # TODO: turn into a proper batch get
     file_records = crud.file.get_many_by_path(conn, files)
-    paths = [f["path"] for f in file_records]
+    paths = [Path(f["path"]) for f in file_records]
     tags = [crud.file_tag.get_by_file_id(conn, file["id"]) for file in file_records]
     roots = [build_tree(tag) for tag in tags]
 

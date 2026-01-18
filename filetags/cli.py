@@ -164,6 +164,12 @@ def drop(vault: Connection, files: tuple[int, ...], retain_file: bool):
     is_flag=True,
     help="Inverts the regex match (not select/exclude).",
 )
+@click.option(
+    "--relative-to",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=Path("."),
+    help="Display paths relative to given directory.",
+)
 @click.pass_obj
 def ls(
     vault: Connection,
@@ -173,6 +179,7 @@ def ls(
     pattern: str,
     ignore_case: bool,
     invert_match: bool,
+    relative_to: Path,
 ):
     # parse nodes
     select_nodes = [parse(n) for n in select]
@@ -196,7 +203,15 @@ def ls(
         )
 
     for path, roots in files_with_tags.items():
-        msg = click.style(path, fg="green")
+        try:
+            # relative path
+            display_path = path.relative_to(relative_to.resolve())
+
+        except ValueError:
+            # default to absolute path if not relative
+            display_path = path
+
+        msg = click.style(display_path, fg="green")
 
         if long:
             msg += "\t" + click.style(",".join(str(root) for root in roots), fg="cyan")
