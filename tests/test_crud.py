@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from filetags import crud
@@ -125,3 +127,185 @@ class TestTagCRUD:
         crud.tag.delete(conn, row["id"])
 
         assert crud.tag.get_by_name(conn, "rock") is None
+
+
+class TestFileCRUD:
+    def test_get_or_create(self, conn):
+        row = crud.file.get_or_create(conn, Path("foo.txt"))
+
+        assert row["id"] is not None
+
+    def test_get_or_create_idempotent(self, conn):
+        row1 = crud.file.get_or_create(conn, Path("foo.txt"))
+        row2 = crud.file.get_or_create(conn, Path("foo.txt"))
+
+        assert row1["id"] == row2["id"]
+
+    def test_get_by_path(self, conn):
+        crud.file.get_or_create(conn, Path("foo.txt"))
+
+        row = crud.file.get_by_path(conn, Path("foo.txt"))
+
+        assert row is not None
+
+    def test_get_by_path_not_found(self, conn):
+        row = crud.file.get_by_path(conn, Path("nonexistent.txt"))
+
+        assert row is None
+
+    def test_get_many_by_path(self, conn):
+        crud.file.get_or_create(conn, Path("a.txt"))
+        crud.file.get_or_create(conn, Path("b.txt"))
+
+        rows = crud.file.get_many_by_path(conn, [Path("a.txt"), Path("b.txt")])
+
+        assert len(rows) == 2
+
+    def test_get_or_create_many(self, conn):
+        rows = crud.file.get_or_create_many(conn, [Path("a.txt"), Path("b.txt")])
+
+        assert len(rows) == 2
+
+    def test_delete(self, conn):
+        row = crud.file.get_or_create(conn, Path("foo.txt"))
+
+        crud.file.delete(conn, row["id"])
+
+        assert crud.file.get_by_path(conn, Path("foo.txt")) is None
+
+
+class TestFileTag:
+    @pytest.fixture
+    def file_and_tag(self, conn):
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        tag_row = crud.tag.create(conn, "rock")
+        return file_row["id"], tag_row["id"]
+
+    def test_attach(self, conn, file_and_tag):
+        file_id, tag_id = file_and_tag
+
+        file_tag_id = crud.file_tag.attach(conn, file_id, tag_id)
+
+        assert file_tag_id is not None
+
+    def test_attach_idempotent(self, conn, file_and_tag):
+        file_id, tag_id = file_and_tag
+
+        id1 = crud.file_tag.attach(conn, file_id, tag_id)
+        id2 = crud.file_tag.attach(conn, file_id, tag_id)
+
+        assert id1 == id2
+
+    def test_attach_with_parent(self, conn, file_and_tag):
+        file_id, tag_id = file_and_tag
+        child_tag = crud.tag.create(conn, "classic")
+
+        parent_id = crud.file_tag.attach(conn, file_id, tag_id)
+        child_id = crud.file_tag.attach(conn, file_id, child_tag["id"], parent_id)
+
+        assert child_id is not None
+        assert child_id != parent_id
+
+    def test_detach(self, conn, file_and_tag):
+        file_id, tag_id = file_and_tag
+        file_tag_id = crud.file_tag.attach(conn, file_id, tag_id)
+
+        crud.file_tag.detach(conn, file_tag_id)
+
+        rows = crud.file_tag.get_by_file_id(conn, file_id)
+        assert rows == []
+
+    def test_get_by_file_id(self, conn, file_and_tag):
+        file_id, tag_id = file_and_tag
+        crud.file_tag.attach(conn, file_id, tag_id)
+
+        rows = crud.file_tag.get_by_file_id(conn, file_id)
+
+        assert len(rows) == 1
+        assert rows[0]["name"] == "rock"
+
+    def test_drop_for_file(self, conn, file_and_tag):
+        file_id, tag_id = file_and_tag
+        crud.file_tag.attach(conn, file_id, tag_id)
+
+        crud.file_tag.drop_for_file(conn, file_id)
+
+        rows = crud.file_tag.get_by_file_id(conn, file_id)
+        assert rows == []
+
+    def test_replace(self, conn, file_and_tag):
+        file_id, tag_id = file_and_tag
+        new_tag = crud.tag.create(conn, "jazz")
+        crud.file_tag.attach(conn, file_id, tag_id)
+
+        crud.file_tag.replace(conn, tag_id, new_tag["id"])
+
+        rows = crud.file_tag.get_by_file_id(conn, file_id)
+        assert rows[0]["name"] == "jazz"
+
+
+class TestTagalong:
+    @pytest.fixture
+    def two_tags(self, conn):
+        t1 = crud.tag.create(conn, "rock")
+        t2 = crud.tag.create(conn, "guitar")
+        return t1["id"], t2["id"]
+
+    def test_create(self, conn, two_tags):
+        source_id, target_id = two_tags
+
+        crud.tagalong.create(conn, source_id, target_id)
+
+        rows = crud.tagalong.get_all_names(conn)
+        assert len(rows) == 1
+        assert rows[0][0] == "rock"
+        assert rows[0][1] == "guitar"
+
+    def test_create_idempotent(self, conn, two_tags):
+        source_id, target_id = two_tags
+
+        crud.tagalong.create(conn, source_id, target_id)
+        crud.tagalong.create(conn, source_id, target_id)
+
+        rows = crud.tagalong.get_all_names(conn)
+        assert len(rows) == 1
+
+    def test_delete(self, conn, two_tags):
+        source_id, target_id = two_tags
+        crud.tagalong.create(conn, source_id, target_id)
+
+        crud.tagalong.delete(conn, source_id, target_id)
+
+        rows = crud.tagalong.get_all_names(conn)
+        assert rows == []
+
+    def test_apply(self, conn, two_tags):
+        source_id, target_id = two_tags
+        crud.tagalong.create(conn, source_id, target_id)
+
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        crud.file_tag.attach(conn, file_row["id"], source_id)
+
+        crud.tagalong.apply(conn, [file_row["id"]])
+
+        rows = crud.file_tag.get_by_file_id(conn, file_row["id"])
+        tag_names = {r["name"] for r in rows}
+        assert tag_names == {"rock", "guitar"}
+
+    def test_apply_transitive(self, conn):
+        """Test that tagalongs are applied transitively: A->B->C"""
+        a = crud.tag.create(conn, "A")
+        b = crud.tag.create(conn, "B")
+        c = crud.tag.create(conn, "C")
+
+        crud.tagalong.create(conn, a["id"], b["id"])
+        crud.tagalong.create(conn, b["id"], c["id"])
+
+        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+        crud.file_tag.attach(conn, file_row["id"], a["id"])
+
+        crud.tagalong.apply(conn, [file_row["id"]])
+
+        rows = crud.file_tag.get_by_file_id(conn, file_row["id"])
+        tag_names = {r["name"] for r in rows}
+        assert tag_names == {"A", "B", "C"}
