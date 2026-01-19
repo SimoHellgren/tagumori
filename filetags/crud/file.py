@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from sqlite3 import Connection, Row
 from typing import Sequence
@@ -9,9 +10,16 @@ from filetags.utils import flatten
 def _get_inode_and_device(path: Path) -> tuple[int | None, int | None]:
     """Get's inode and device if file exists, otherwise None.
 
-    Used mainly as a convenience for testing, as most tests do not use real
-    files. Might want to change later.
+    Skips is on Windows, because inode,device aren't really robust
+    (and they are intended for finding files whose names have changed).
+
+    Useful also for convenience in test where we don't actually
+    create the files.
     """
+
+    if sys.platform == "win32":
+        return None, None
+
     try:
         stat = path.stat()
         return stat.st_ino, stat.st_dev
