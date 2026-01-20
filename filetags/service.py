@@ -116,16 +116,18 @@ def _find_files_matching_all_paths(conn: Connection, node: Node) -> set[int]:
 
 
 def search_files(conn: Connection, select_tags: list[Node], exclude_tags: list[Node]):
-    include_ids = set.union(
-        set(), *(_find_files_matching_all_paths(conn, n) for n in select_tags)
-    )
+    if select_tags:
+        include_ids = set.union(
+            set(), *(_find_files_matching_all_paths(conn, n) for n in select_tags)
+        )
+    else:
+        # fallback to all ids if no select_tags provided
+        # TODO: when grammar gets improved, could just default to -s "*" in the cli instead.
+        include_ids = set(x["id"] for x in crud.file.get_all(conn))
+
     exclude_ids = set.union(
         set(), *(_find_files_matching_all_paths(conn, n) for n in exclude_tags)
     )
-
-    # TODO: this is a dumb way to handle the case where the user provides only exclude tags
-    if not include_ids:
-        include_ids = set(x["id"] for x in crud.file.get_all(conn))
 
     ids = tuple(include_ids - exclude_ids)
 

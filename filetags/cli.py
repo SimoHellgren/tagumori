@@ -192,11 +192,7 @@ def ls(
     # TODO: some double-fetching here, still, but better than before
     # TODO: if not --long, could no need to fetch tags.
     with vault as conn:
-        if select_nodes or exclude_nodes:
-            files = service.search_files(conn, select_nodes, exclude_nodes)
-
-        else:
-            files = service.get_all_files(conn)
+        files = service.search_files(conn, select_nodes, exclude_nodes)
 
         filtered = [f for f in files if bool(regex.search(f["path"])) ^ invert_match]
 
