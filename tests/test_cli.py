@@ -364,6 +364,35 @@ class TestLs:
         assert "song.mp3" in result.output
         assert "document.pdf" not in result.output
 
+    def test_ls_prefix(self, runner, vault, tmp_path):
+        """--prefix should prepend a path to the output after applying --relative-to."""
+        subdir = tmp_path / "mount" / "server"
+        subdir.mkdir(parents=True)
+        file = subdir / "file.txt"
+        file.write_text("content")
+
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(file), "-t", "docs"]
+        )
+
+        result = runner.invoke(
+            cli,
+            [
+                "--vault",
+                str(vault),
+                "ls",
+                "--relative-to",
+                str(subdir),
+                "--prefix",
+                "/remote",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "/remote/file.txt" in result.output
+        # Should not contain the original mount path
+        assert str(tmp_path) not in result.output
+
 
 # ============================================================
 # Tag subcommands

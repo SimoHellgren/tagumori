@@ -170,6 +170,7 @@ def drop(vault: Connection, files: tuple[int, ...], retain_file: bool):
     default=Path("."),
     help="Display paths relative to given directory.",
 )
+@click.option("--prefix", default="")
 @click.pass_obj
 def ls(
     vault: Connection,
@@ -180,6 +181,7 @@ def ls(
     ignore_case: bool,
     invert_match: bool,
     relative_to: Path,
+    prefix: str,
 ):
     # parse nodes
     select_nodes = [parse(n) for n in select]
@@ -205,11 +207,11 @@ def ls(
     for path, roots in files_with_tags.items():
         try:
             # relative path
-            display_path = path.relative_to(relative_to.resolve())
+            display_path = prefix / path.relative_to(relative_to.resolve())
 
         except ValueError:
             # default to absolute path if not relative
-            display_path = path
+            display_path = prefix / path
 
         msg = click.style(display_path, fg="green")
 

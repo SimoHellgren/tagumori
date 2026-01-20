@@ -222,7 +222,6 @@ class TestFileCRUD:
 
     def test_inode_device_null_for_nonexistent_path(self, conn):
         """For paths that don't exist on disk, inode/device should be null."""
-        # This tests the current behavior - you may want to change this
         crud.file.get_or_create(conn, Path("nonexistent.txt"))
 
         fetched = crud.file.get_by_path(conn, Path("nonexistent.txt").resolve())
@@ -235,7 +234,6 @@ class TestFileCRUD:
         real_file = tmp_path / "file.txt"
         real_file.write_text("content")
 
-        # Use a relative-style path (though tmp_path is absolute, we test the resolve behavior)
         crud.file.get_or_create(conn, real_file)
 
         fetched = crud.file.get_by_path(conn, real_file)
