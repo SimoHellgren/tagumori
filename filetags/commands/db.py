@@ -4,8 +4,10 @@ from pathlib import Path
 
 import click
 
+from filetags import service
 from filetags.commands.context import LazyVault
 from filetags.db.init import init_db
+from filetags.models.node import Node
 
 
 @click.group(help="Database management")
@@ -58,3 +60,36 @@ def backup(vault: LazyVault, dest: Path, directory: Path):
             source.backup(destination)
 
     click.echo(f"Backup created: {backup_path}")
+
+
+@db.command(help="Migrate legacy json vault into SQLite.")
+@click.argument("json-vault", type=click.Path(path_type=Path, exists=True))
+@click.pass_obj
+def migrate_json(vault: LazyVault, json_vault: Path):
+    import json
+
+    from filetags import crud
+
+    with open(json_vault) as f:
+        data = json.load(f)
+
+    def parse(tag: dict):
+        name = tag["name"]
+        children = [parse(c) for c in tag["children"]]
+        return Node(name, children)
+
+    with vault as conn:
+        for entry in data["entries"]:
+            path = Path(entry["name"])
+            tags = [parse(c) for c in entry["children"]]
+
+            service.add_tags_to_files(conn, [path], tags, False)
+
+        sources, targets = zip(*data["tagalongs"])
+        source_rows = crud.tag.get_or_create_many(conn, sources)
+        target_rows = crud.tag.get_or_create_many(conn, targets)
+
+        for source, target in zip(source_rows, target_rows):
+            crud.tagalong.create(conn, source["id"], target["id"])
+
+        crud.tagalong.apply(conn)

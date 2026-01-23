@@ -119,7 +119,7 @@ def set_(
     "-f",
     "files",
     required=True,
-    type=click.Path(path_type=Path, exists=True),
+    type=click.Path(path_type=Path),
     multiple=True,
 )
 @click.option("--retain-file", type=click.BOOL, is_flag=True)
@@ -194,39 +194,6 @@ def ls(
             msg += "\t" + click.style(",".join(str(root) for root in roots), fg="cyan")
 
         click.echo(msg)
-
-
-@cli.command(help="Migrate legacy json vault into SQLite.")
-@click.argument("json-vault", type=click.Path(path_type=Path, exists=True))
-@click.pass_obj
-def migrate_json(vault: LazyVault, json_vault: Path):
-    import json
-
-    from filetags import crud
-
-    with open(json_vault) as f:
-        data = json.load(f)
-
-    def parse(tag: dict):
-        name = tag["name"]
-        children = [parse(c) for c in tag["children"]]
-        return Node(name, children)
-
-    with vault as conn:
-        for entry in data["entries"]:
-            path = Path(entry["name"])
-            tags = [parse(c) for c in entry["children"]]
-
-            service.add_tags_to_files(conn, [path], tags, False)
-
-        sources, targets = zip(*data["tagalongs"])
-        source_rows = crud.tag.get_or_create_many(conn, sources)
-        target_rows = crud.tag.get_or_create_many(conn, targets)
-
-        for source, target in zip(source_rows, target_rows):
-            crud.tagalong.create(conn, source["id"], target["id"])
-
-        crud.tagalong.apply(conn)
 
 
 def main():
