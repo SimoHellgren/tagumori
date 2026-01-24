@@ -234,23 +234,6 @@ class TestRemove:
 
 
 # ============================================================
-# Show command
-# ============================================================
-
-
-class TestShow:
-    def test_show_file_tags(self, runner, vault, sample_file):
-        runner.invoke(
-            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
-        )
-
-        result = runner.invoke(cli, ["--vault", str(vault), "show", str(sample_file)])
-
-        assert result.exit_code == 0
-        assert "rock" in result.output
-
-
-# ============================================================
 # Set command
 # ============================================================
 
@@ -271,7 +254,7 @@ class TestSet:
 
         # Verify
         show_result = runner.invoke(
-            cli, ["--vault", str(vault), "show", str(sample_file)]
+            cli, ["--vault", str(vault), "file", "info", str(sample_file)]
         )
         assert "jazz" in show_result.output
 
@@ -632,6 +615,105 @@ class TestTagCommands:
 # ============================================================
 
 
+# ============================================================
+# File info command
+# ============================================================
+
+
+class TestFileInfo:
+    def test_info_shows_file_details(self, runner, vault, sample_file):
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
+        )
+
+        result = runner.invoke(
+            cli, ["--vault", str(vault), "file", "info", str(sample_file)]
+        )
+
+        assert result.exit_code == 0
+        assert str(sample_file) in result.output
+        assert "rock" in result.output
+
+    def test_info_existing_file_shows_exists(self, runner, vault, sample_file):
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
+        )
+
+        result = runner.invoke(
+            cli, ["--vault", str(vault), "file", "info", str(sample_file)]
+        )
+
+        assert result.exit_code == 0
+        assert "Exists" in result.output
+
+    def test_info_missing_file_shows_not_found(self, runner, vault, sample_file):
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
+        )
+        # Delete the file after adding it to the vault
+        sample_file.unlink()
+
+        result = runner.invoke(
+            cli, ["--vault", str(vault), "file", "info", str(sample_file)]
+        )
+
+        assert result.exit_code == 0
+        assert "Not found" in result.output
+
+    def test_info_inode_ok(self, runner, vault, sample_file):
+        """Inode should show OK when file's inode matches the record."""
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
+        )
+
+        result = runner.invoke(
+            cli, ["--vault", str(vault), "file", "info", str(sample_file)]
+        )
+
+        assert result.exit_code == 0
+        assert "OK" in result.output
+
+    def test_info_inode_mismatch(self, runner, vault, sample_file, tmp_path):
+        """Inode should show Mismatch when file's inode differs from record."""
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
+        )
+        # Move original file away (keeps its inode), create new file at same path
+        backup = tmp_path / "backup.txt"
+        sample_file.rename(backup)
+        sample_file.write_text("new content")
+
+        result = runner.invoke(
+            cli, ["--vault", str(vault), "file", "info", str(sample_file)]
+        )
+
+        assert result.exit_code == 0
+        assert "Mismatch" in result.output
+
+    def test_info_multiple_files(self, runner, vault, tmp_path):
+        file1 = tmp_path / "file1.txt"
+        file2 = tmp_path / "file2.txt"
+        file1.write_text("content1")
+        file2.write_text("content2")
+
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(file1), "-t", "rock"]
+        )
+        runner.invoke(
+            cli, ["--vault", str(vault), "add", "-f", str(file2), "-t", "jazz"]
+        )
+
+        result = runner.invoke(
+            cli, ["--vault", str(vault), "file", "info", str(file1), str(file2)]
+        )
+
+        assert result.exit_code == 0
+        assert "file1.txt" in result.output
+        assert "file2.txt" in result.output
+        assert "rock" in result.output
+        assert "jazz" in result.output
+
+
 class TestTagalongCommands:
     def test_tagalong_add(self, runner, vault):
         result = runner.invoke(
@@ -708,6 +790,6 @@ class TestTagalongCommands:
 
         # Verify tagalong was applied
         show_result = runner.invoke(
-            cli, ["--vault", str(vault), "show", str(sample_file)]
+            cli, ["--vault", str(vault), "file", "info", str(sample_file)]
         )
         assert "guitar" in show_result.output

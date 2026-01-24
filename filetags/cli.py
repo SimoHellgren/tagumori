@@ -3,7 +3,7 @@ from pathlib import Path
 import click
 
 from filetags import service
-from filetags.commands import db, tag, tagalong
+from filetags.commands import db, file, tag, tagalong
 from filetags.commands.context import LazyVault
 from filetags.models.node import Node
 from filetags.parser import parse
@@ -27,6 +27,7 @@ def cli(ctx: click.Context, vault: Path):
 cli.add_command(tag.tag)
 cli.add_command(tagalong.tagalong)
 cli.add_command(db.db)
+cli.add_command(file.file)
 
 
 @cli.command(help="Add tags to files")
@@ -72,21 +73,6 @@ def remove(vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...]):
 
     with vault as conn:
         service.remove_tags_from_files(conn, files, root_tags)
-
-
-@cli.command(help="Show tags of files")
-@click.argument("files", nargs=-1, type=click.Path(path_type=Path))
-@click.pass_obj
-def show(vault: LazyVault, files: tuple[Path, ...]):
-    with vault as conn:
-        files_with_tags = service.get_files_with_tags(conn, files)
-
-    for path, roots in files_with_tags.items():
-        click.echo(
-            click.style(path, fg="green")
-            + "\t"
-            + click.style(",".join(str(root) for root in roots), fg="cyan")
-        )
 
 
 @cli.command(help="Replace tags on files", name="set")
@@ -179,7 +165,8 @@ def ls(
             conn, [Path(f["path"]) for f in filtered]
         )
 
-    for path, roots in files_with_tags.items():
+    for path, data in files_with_tags.items():
+        roots = data["roots"]
         try:
             # relative path
             display_path = prefix / path.relative_to(relative_to.resolve())
