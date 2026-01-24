@@ -61,6 +61,5 @@ def info(vault: LazyVault, files: tuple[Path, ...]):
                 f"Tags: {','.join(str(root) for root in roots)}",
                 "Path: " + click.style(**check_path(path)),
                 "Inode/device: " + click.style(**check_inode(path, record)),
-                "",
             ],
         )
