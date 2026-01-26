@@ -39,6 +39,9 @@ class FileCRUD(BaseCRUD):
     def get_many_by_path(self, conn: Connection, paths: Sequence[Path]) -> list[Row]:
         return self.get_many_by_unique_col(conn, [str(p.resolve()) for p in paths])
 
+    def get_by_inode(self, conn: Connection, inode: int) -> list[Row]:
+        return conn.execute("SELECT * FROM file WHERE inode = ?", (inode,)).fetchall()
+
     def get_or_create(self, conn: Connection, path: Path) -> Row:
         q = """
                 INSERT INTO file (path, inode, device) VALUES (?,?,?)
@@ -59,6 +62,14 @@ class FileCRUD(BaseCRUD):
         params = [(str(p.resolve()), *_get_inode_and_device(p)) for p in paths]
 
         return conn.execute(q, tuple(flatten(params))).fetchall()
+
+    def update(
+        self, conn: Connection, file_id: int, path: Path, inode: int, device: int
+    ):
+        conn.execute(
+            "UPDATE file SET path = ?, inode = ?, device = ? WHERE id = ?",
+            (str(path.resolve()), inode, device, file_id),
+        )
 
 
 file = FileCRUD()

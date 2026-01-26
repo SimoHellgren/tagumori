@@ -99,11 +99,12 @@ def drop_file_tags(conn: Connection, files: list[Path], retain_file: bool = Fals
 def get_files_with_tags(conn: Connection, files: list[Path]) -> dict[Path, list[Node]]:
     # TODO: turn into a proper batch get
     file_records = crud.file.get_many_by_path(conn, files)
-    paths = [Path(f["path"]) for f in file_records]
     tags = [crud.file_tag.get_by_file_id(conn, file["id"]) for file in file_records]
     roots = [build_tree(tag) for tag in tags]
 
-    return dict(zip(paths, roots))
+    return {
+        Path(f["path"]): {"file": f, "roots": r} for f, r in zip(file_records, roots)
+    }
 
 
 def _find_files_matching_all_paths(conn: Connection, node: Node) -> set[int]:
@@ -139,3 +140,18 @@ def search_files(conn: Connection, select_tags: list[Node], exclude_tags: list[N
 def get_all_files(conn: Connection) -> list[Row]:
     files = crud.file.get_all(conn)
     return sorted(files, key=lambda x: x["path"])
+
+
+def relocate_file(conn: Connection, file: Row, search_root: Path):
+    """Finds a file by inode/device and updates its path."""
+    target_inode = file["inode"]
+    target_device = file["device"]
+
+    for path in search_root.rglob("*"):
+        if not path.is_file():
+            continue
+
+        stat = path.stat()
+
+        if stat.st_ino == target_inode and stat.st_dev == target_device:
+            crud.file.update(conn, file["id"], path, stat.st_ino, stat.st_dev)

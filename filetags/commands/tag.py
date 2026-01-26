@@ -1,15 +1,15 @@
-from sqlite3 import Connection
 from typing import Optional
 
 import click
 
 from filetags import crud
+from filetags.commands.context import LazyVault
 from filetags.utils import compile_pattern
 
 
 @click.group(help="Tag management")
 @click.pass_obj
-def tag(vault: Connection):
+def tag(vault: LazyVault):
     pass
 
 
@@ -17,7 +17,7 @@ def tag(vault: Connection):
 @click.option("-n", "--name", type=click.STRING, required=True)
 @click.option("-c", "--category", type=click.STRING)
 @click.pass_obj
-def new_tag(vault: Connection, name: str, category: Optional[str]):
+def new_tag(vault: LazyVault, name: str, category: Optional[str]):
     with vault as conn:
         crud.tag.create(conn, name, category)
 
@@ -30,7 +30,7 @@ def new_tag(vault: Connection, name: str, category: Optional[str]):
     "--clear-category", type=click.BOOL, is_flag=True, help="Sets category to null."
 )
 @click.pass_obj
-def edit_tag(vault: Connection, tag: list[str], clear_category: bool, **kwargs):
+def edit_tag(vault: LazyVault, tag: list[str], clear_category: bool, **kwargs):
     if len(tag) > 1 and kwargs["name"]:
         raise click.BadArgumentUsage(
             "--name can't be present when multiple tags are given."
@@ -65,7 +65,7 @@ def edit_tag(vault: Connection, tag: list[str], clear_category: bool, **kwargs):
     help="Remove the replaced tags entirely.",
 )
 @click.pass_obj
-def replace_tag(vault: Connection, old: tuple[str, ...], new: str, remove: bool):
+def replace_tag(vault: LazyVault, old: tuple[str, ...], new: str, remove: bool):
     with vault as conn:
         new_record = crud.tag.get_or_create(conn, new)
         olds = crud.tag.get_many_by_name(conn, old)
@@ -79,7 +79,7 @@ def replace_tag(vault: Connection, old: tuple[str, ...], new: str, remove: bool)
 @tag.command(help="Removes all instances of a tag.", name="delete")
 @click.argument("tags", nargs=-1, type=click.STRING, required=True)
 @click.pass_obj
-def remove_tag(vault: Connection, tags: tuple[str, ...]):
+def remove_tag(vault: LazyVault, tags: tuple[str, ...]):
     click.confirm(
         "Are you sure? This will also delete all child filetags of deleted tags.",
         abort=True,
@@ -98,7 +98,7 @@ def remove_tag(vault: Connection, tags: tuple[str, ...]):
 @click.option("-v", "--invert-match", is_flag=True)
 @click.pass_obj
 def list_tags(
-    vault: Connection,
+    vault: LazyVault,
     long: bool,
     pattern: str,
     ignore_case: bool,
