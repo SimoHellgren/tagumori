@@ -24,3 +24,21 @@ def sample_file(tmp_path):
     file_path = tmp_path / "sample.txt"
     file_path.write_text("test content")
     return file_path
+
+
+@pytest.fixture
+def tagged_file(runner, vault, sample_file):
+    """A sample file already tagged with 'rock'."""
+    runner.invoke(
+        cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
+    )
+    return sample_file
+
+
+@pytest.fixture
+def sample_files(tmp_path):
+    """Creates two temporary files for multi-file tests."""
+    files = [tmp_path / "file1.txt", tmp_path / "file2.txt"]
+    for f in files:
+        f.write_text("content")
+    return files

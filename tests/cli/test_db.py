@@ -60,13 +60,8 @@ class TestBackup:
         backup_files = list(backup_dir.glob("test_vault-*.db"))
         assert len(backup_files) == 1
 
-    def test_backup_is_valid_sqlite(self, runner, vault, tmp_path, sample_file):
+    def test_backup_is_valid_sqlite(self, runner, vault, tmp_path, tagged_file):
         import sqlite3
-
-        # Add some data first
-        runner.invoke(
-            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
-        )
 
         backup_path = tmp_path / "backup.db"
         runner.invoke(cli, ["--vault", str(vault), "db", "backup", str(backup_path)])

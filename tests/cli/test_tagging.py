@@ -67,49 +67,34 @@ class TestAdd:
 
 
 class TestRemove:
-    def test_remove_tag(self, runner, vault, sample_file):
-        # First add a tag
-        runner.invoke(
-            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
-        )
-
+    def test_remove_tag(self, runner, vault, tagged_file):
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "remove", "-f", str(sample_file), "-t", "rock"],
+            ["--vault", str(vault), "remove", "-f", str(tagged_file), "-t", "rock"],
         )
 
         assert result.exit_code == 0
 
 
 class TestSet:
-    def test_set_replaces_tags(self, runner, vault, sample_file):
-        # Add initial tag
-        runner.invoke(
-            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
-        )
-
-        # Set to different tag
+    def test_set_replaces_tags(self, runner, vault, tagged_file):
         result = runner.invoke(
-            cli, ["--vault", str(vault), "set", "-f", str(sample_file), "-t", "jazz"]
+            cli, ["--vault", str(vault), "set", "-f", str(tagged_file), "-t", "jazz"]
         )
 
         assert result.exit_code == 0
 
         # Verify
         show_result = runner.invoke(
-            cli, ["--vault", str(vault), "file", "info", str(sample_file)]
+            cli, ["--vault", str(vault), "file", "info", str(tagged_file)]
         )
         assert "jazz" in show_result.output
 
 
 class TestDrop:
-    def test_drop_removes_all_tags(self, runner, vault, sample_file):
-        runner.invoke(
-            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
-        )
-
+    def test_drop_removes_all_tags(self, runner, vault, tagged_file):
         result = runner.invoke(
-            cli, ["--vault", str(vault), "drop", "-f", str(sample_file)]
+            cli, ["--vault", str(vault), "drop", "-f", str(tagged_file)]
         )
 
         assert result.exit_code == 0
@@ -122,15 +107,11 @@ class TestLs:
         assert result.exit_code == 0
         assert result.output == ""
 
-    def test_ls_shows_files(self, runner, vault, sample_file):
-        runner.invoke(
-            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
-        )
-
+    def test_ls_shows_files(self, runner, vault, tagged_file):
         result = runner.invoke(cli, ["--vault", str(vault), "ls"])
 
         assert result.exit_code == 0
-        assert "sample.txt" in result.output
+        assert tagged_file.name in result.output
 
     def test_ls_relative_to(self, runner, vault, tmp_path):
         """--relative-to should display paths relative to the given directory."""
@@ -195,15 +176,11 @@ class TestLs:
         assert result.exit_code == 0
         assert "outside.txt" in result.output
 
-    def test_ls_long_format(self, runner, vault, sample_file):
-        runner.invoke(
-            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
-        )
-
+    def test_ls_long_format(self, runner, vault, tagged_file):
         result = runner.invoke(cli, ["--vault", str(vault), "ls", "-l"])
 
         assert result.exit_code == 0
-        assert "sample.txt" in result.output
+        assert tagged_file.name in result.output
         assert "rock" in result.output
 
     def test_ls_select_filter(self, runner, vault, tmp_path):

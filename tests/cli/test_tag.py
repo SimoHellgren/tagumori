@@ -134,11 +134,7 @@ class TestTagCommands:
 
         assert result.exit_code != 0  # Aborted
 
-    def test_tag_replace(self, runner, vault, sample_file):
-        runner.invoke(
-            cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
-        )
-
+    def test_tag_replace(self, runner, vault, tagged_file):
         result = runner.invoke(
             cli, ["--vault", str(vault), "tag", "replace", "rock", "-n", "jazz"]
         )
