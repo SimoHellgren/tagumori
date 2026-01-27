@@ -54,12 +54,9 @@ CREATE INDEX IF NOT EXISTS idx_tagalong_tag_id ON tagalong(tag_id);
 CREATE TABLE IF NOT EXISTS query (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    long BOOLEAN,
     select_tags JSONB,
     exclude_tags JSONB,
     pattern TEXT,
     ignore_case BOOLEAN,
-    invert_match BOOLEAN,
-    relative_to TEXT,
-    prefix TEXT
+    invert_match BOOLEAN
 );
