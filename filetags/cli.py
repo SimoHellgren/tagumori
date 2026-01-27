@@ -3,7 +3,7 @@ from pathlib import Path
 import click
 
 from filetags import service
-from filetags.commands import db, file, tag, tagalong
+from filetags.commands import db, file, query, tag, tagalong
 from filetags.commands.context import LazyVault
 from filetags.models.node import Node
 from filetags.parser import parse
@@ -28,6 +28,7 @@ cli.add_command(tag.tag)
 cli.add_command(tagalong.tagalong)
 cli.add_command(db.db)
 cli.add_command(file.file)
+cli.add_command(query.query)
 
 
 @cli.command(help="Add tags to files")

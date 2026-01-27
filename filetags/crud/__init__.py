@@ -3,4 +3,5 @@ from filetags.crud import (
     tagalong,  # noqa: F401
 )
 from filetags.crud.file import file  # noqa: F401
+from filetags.crud.query import query  # noqa: F401
 from filetags.crud.tag import tag  # noqa: F401
