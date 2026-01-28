@@ -1,7 +1,10 @@
+from pathlib import Path
+
 import click
 
 from filetags import crud, service
 from filetags.commands.context import LazyVault
+from filetags.utils import format_file_output
 
 
 @click.group(help="Query management.")
@@ -65,8 +68,18 @@ def save(
 
 @query.command(help="Run a saved query")
 @click.argument("name", type=str)
+@click.option(
+    "-l", "--long", type=click.BOOL, is_flag=True, help="Long listing format."
+)
+@click.option(
+    "--relative-to",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=Path("."),
+    help="Display paths relative to given directory.",
+)
+@click.option("--prefix", default="")
 @click.pass_obj
-def run(vault: LazyVault, name: str):
+def run(vault: LazyVault, name: str, long: bool, relative_to: Path, prefix: str):
     """POC implementation"""
     import json
 
@@ -87,8 +100,14 @@ def run(vault: LazyVault, name: str):
             bool(params["invert_match"]),
         )
 
-    for path in paths:
-        click.echo(path)
+        if long:
+            files_with_tags = service.get_files_with_tags(conn, paths)
+
+        else:
+            files_with_tags = {f: {} for f in paths}
+
+    for msg in format_file_output(files_with_tags, long, relative_to, prefix):
+        click.echo(msg)
 
 
 @query.command(help="List all saved queries.")

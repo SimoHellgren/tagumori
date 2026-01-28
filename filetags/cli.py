@@ -7,7 +7,7 @@ from filetags.commands import db, file, query, tag, tagalong
 from filetags.commands.context import LazyVault
 from filetags.models.node import Node
 from filetags.parser import parse
-from filetags.utils import flatten
+from filetags.utils import flatten, format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
 
@@ -160,23 +160,13 @@ def ls(
             conn, select_nodes, exclude_nodes, pattern, ignore_case, invert_match
         )
 
-        files_with_tags = service.get_files_with_tags(conn, paths)
-
-    for path, data in files_with_tags.items():
-        roots = data["roots"]
-        try:
-            # relative path
-            display_path = prefix / path.relative_to(relative_to.resolve())
-
-        except ValueError:
-            # default to absolute path if not relative
-            display_path = prefix / path
-
-        msg = click.style(display_path, fg="green")
-
         if long:
-            msg += "\t" + click.style(",".join(str(root) for root in roots), fg="cyan")
+            files_with_tags = service.get_files_with_tags(conn, paths)
 
+        else:
+            files_with_tags = {f: {} for f in paths}
+
+    for msg in format_file_output(files_with_tags, long, relative_to, prefix):
         click.echo(msg)
 
 
