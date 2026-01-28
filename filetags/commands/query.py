@@ -22,6 +22,12 @@ def query(vault: LazyVault):
     is_flag=True,
     help="Inverts the regex match (not select/exclude).",
 )
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    help="Overwrites existing query if present.",
+)
 @click.pass_obj
 def save(
     vault: LazyVault,
@@ -31,19 +37,30 @@ def save(
     pattern: str,
     ignore_case: bool,
     invert_match: bool,
+    force: bool,
 ):
     import json
 
+    data = {
+        "name": name,
+        "select_tags": json.dumps(list(select)),
+        "exclude_tags": json.dumps(list(exclude)),
+        "pattern": pattern,
+        "ignore_case": ignore_case,
+        "invert_match": invert_match,
+    }
+
     with vault as conn:
-        crud.query.create(
-            conn,
-            name,
-            json.dumps(list(select)),
-            json.dumps(list(exclude)),
-            pattern,
-            ignore_case,
-            invert_match,
-        )
+        if force:
+            crud.query.upsert(conn, **data)
+
+        else:
+            # check if exists
+            if crud.query.get_by_name(conn, name):
+                raise click.ClickException(
+                    f"Query '{name}' already exists. Run with --force to overwrite."
+                )
+            crud.query.create(conn, **data)
 
 
 @query.command(help="Run a saved query")
@@ -72,3 +89,23 @@ def run(vault: LazyVault, name: str):
 
     for path in paths:
         click.echo(path)
+
+
+@query.command(help="List all saved queries.")
+@click.pass_obj
+def ls(vault: LazyVault):
+    with vault as conn:
+        records = crud.query.get_all(conn)
+
+    for record in records:
+        click.echo(dict(record))
+
+
+@query.command(help="Delete query.")
+@click.argument("name", nargs=-1, type=str)
+@click.pass_obj
+def drop(vault: LazyVault, name: tuple[str, ...]):
+    with vault as conn:
+        for name_ in name:
+            record = crud.query.get_by_name(conn, name_)
+            crud.query.delete(conn, record["id"])
