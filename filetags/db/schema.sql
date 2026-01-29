@@ -1,5 +1,5 @@
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 
 CREATE TABLE IF NOT EXISTS file (
     id INTEGER PRIMARY KEY,
@@ -50,3 +50,13 @@ CREATE TABLE IF NOT EXISTS tagalong (
 
 -- Index for lookup; mostly for `apply`
 CREATE INDEX IF NOT EXISTS idx_tagalong_tag_id ON tagalong(tag_id);
+
+CREATE TABLE IF NOT EXISTS query (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    select_tags JSONB,
+    exclude_tags JSONB,
+    pattern TEXT,
+    ignore_case BOOLEAN,
+    invert_match BOOLEAN
+);

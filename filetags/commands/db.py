@@ -116,3 +116,17 @@ def info(vault: LazyVault):
         for (table_name,) in tables:
             count = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
             click.echo(f"  {table_name}: {count} rows")
+
+
+@db.command(help="Migrate SQLite db to newest version")
+@click.pass_obj
+def migrate(vault: LazyVault):
+    """Simply reapplies schema.sql - assumes idempotent query.
+    Will reassess if needed.
+    """
+    from filetags.db.init import SCHEMA_PATH
+
+    with vault as conn:
+        conn.executescript(SCHEMA_PATH.read_text())
+
+    click.echo("Schema updated")

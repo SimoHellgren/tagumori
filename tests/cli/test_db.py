@@ -97,6 +97,54 @@ class TestBackup:
         assert backup_path.stat().st_size > len("existing")  # Now it's a real db
 
 
+class TestMigrate:
+    def test_migrate_runs_successfully(self, runner, vault):
+        result = runner.invoke(cli, ["--vault", str(vault), "db", "migrate"])
+
+        assert result.exit_code == 0
+        assert "Schema updated" in result.output
+
+    def test_migrate_is_idempotent(self, runner, vault):
+        # Run migrate twice - should succeed both times
+        result1 = runner.invoke(cli, ["--vault", str(vault), "db", "migrate"])
+        result2 = runner.invoke(cli, ["--vault", str(vault), "db", "migrate"])
+
+        assert result1.exit_code == 0
+        assert result2.exit_code == 0
+
+    def test_migrate_preserves_existing_data(self, runner, vault, tagged_file):
+        import sqlite3
+
+        # Verify data exists before migration
+        conn = sqlite3.connect(vault)
+        count_before = conn.execute("SELECT COUNT(*) FROM file").fetchone()[0]
+        conn.close()
+
+        # Run migration
+        result = runner.invoke(cli, ["--vault", str(vault), "db", "migrate"])
+        assert result.exit_code == 0
+
+        # Verify data still exists after migration
+        conn = sqlite3.connect(vault)
+        count_after = conn.execute("SELECT COUNT(*) FROM file").fetchone()[0]
+        conn.close()
+
+        assert count_before == count_after == 1
+
+    def test_migrate_creates_query_table(self, runner, vault):
+        import sqlite3
+
+        runner.invoke(cli, ["--vault", str(vault), "db", "migrate"])
+
+        conn = sqlite3.connect(vault)
+        tables = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='query'"
+        ).fetchall()
+        conn.close()
+
+        assert len(tables) == 1
+
+
 class TestInfo:
     def test_info_shows_basic_fields(self, runner, vault):
         result = runner.invoke(cli, ["--vault", str(vault), "db", "info"])

@@ -3,11 +3,11 @@ from pathlib import Path
 import click
 
 from filetags import service
-from filetags.commands import db, file, tag, tagalong
+from filetags.commands import db, file, query, tag, tagalong
 from filetags.commands.context import LazyVault
 from filetags.models.node import Node
 from filetags.parser import parse
-from filetags.utils import compile_pattern, flatten
+from filetags.utils import flatten, format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
 
@@ -28,6 +28,7 @@ cli.add_command(tag.tag)
 cli.add_command(tagalong.tagalong)
 cli.add_command(db.db)
 cli.add_command(file.file)
+cli.add_command(query.query)
 
 
 @cli.command(help="Add tags to files")
@@ -152,34 +153,20 @@ def ls(
     select_nodes = [parse(n) for n in select]
     exclude_nodes = [parse(n) for n in exclude]
 
-    regex = compile_pattern(pattern, ignore_case)
-
     # TODO: some double-fetching here, still, but better than before
     # TODO: if not --long, could no need to fetch tags.
     with vault as conn:
-        files = service.search_files(conn, select_nodes, exclude_nodes)
-
-        filtered = [f for f in files if bool(regex.search(f["path"])) ^ invert_match]
-
-        files_with_tags = service.get_files_with_tags(
-            conn, [Path(f["path"]) for f in filtered]
+        paths = service.execute_query(
+            conn, select_nodes, exclude_nodes, pattern, ignore_case, invert_match
         )
 
-    for path, data in files_with_tags.items():
-        roots = data["roots"]
-        try:
-            # relative path
-            display_path = prefix / path.relative_to(relative_to.resolve())
-
-        except ValueError:
-            # default to absolute path if not relative
-            display_path = prefix / path
-
-        msg = click.style(display_path, fg="green")
-
         if long:
-            msg += "\t" + click.style(",".join(str(root) for root in roots), fg="cyan")
+            files_with_tags = service.get_files_with_tags(conn, paths)
 
+        else:
+            files_with_tags = {f: {} for f in paths}
+
+    for msg in format_file_output(files_with_tags, long, relative_to, prefix):
         click.echo(msg)
 
 

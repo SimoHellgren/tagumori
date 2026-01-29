@@ -3,7 +3,7 @@ from sqlite3 import Connection, Row
 
 from filetags import crud
 from filetags.models.node import Node
-from filetags.utils import flatten
+from filetags.utils import compile_pattern, flatten
 
 
 def attach_tree(
@@ -135,6 +135,23 @@ def search_files(conn: Connection, select_tags: list[Node], exclude_tags: list[N
     files = crud.file.get_many(conn, ids)
 
     return sorted(files, key=lambda x: x["path"])
+
+
+def execute_query(
+    conn: Connection,
+    select_tags: list[Node],
+    exclude_tags: list[Node],
+    pattern: str = ".*",
+    ignore_case: bool = False,
+    invert_match: bool = False,
+) -> list[Path]:
+    files = search_files(conn, select_tags, exclude_tags)
+
+    regex = compile_pattern(pattern, ignore_case)
+
+    return [
+        Path(f["path"]) for f in files if bool(regex.search(f["path"])) ^ invert_match
+    ]
 
 
 def get_all_files(conn: Connection) -> list[Row]:
