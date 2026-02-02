@@ -16,8 +16,14 @@ class Tag:
 
 @dataclass
 class Xor:
-    left: "Expr"
-    right: "Expr"
+    """Binary XOR - true when odd number of operands are true."""
+    operands: list["Expr"]
+
+
+@dataclass
+class OnlyOne:
+    """Exactly one of - true when exactly one operand is true."""
+    operands: list["Expr"]
 
 
 @dataclass
@@ -61,6 +67,9 @@ class Transformer(lark.Transformer):
     def NAME(self, token):
         return str(token)
 
+    def XOR_KW(self, token):
+        return str(token)
+
     def BOUNDED_WILDCARD(self, token):
         """Gets the n from '*n*'"""
         return int(str(token)[1:-1])
@@ -75,10 +84,13 @@ class Transformer(lark.Transformer):
     # binary ops
     def xor_expr(self, children):
         if len(children) == 1:
-            # no xor here, just return child
             return children[0]
+        return Xor(children)
 
-        return Xor(*children)
+    def only_one(self, children):
+        # Filter out "xor" keyword string
+        children = [c for c in children if c != "xor"]
+        return OnlyOne(children)
 
     def or_expr(self, children):
         if len(children) == 1:
@@ -105,6 +117,13 @@ class Transformer(lark.Transformer):
             return Tag(name=children[0])
         return Tag(name=children[0], children=children[1])
 
+    def tag_xor(self, children):
+        """Handle 'xor' used as a tag name (not the function)."""
+        # children[0] is "xor" string, children[1] (if present) is the query
+        if len(children) == 1:
+            return Tag(name="xor")
+        return Tag(name="xor", children=children[1])
+
     def null_expr(self, children):
         if len(children) == 0:
             return Null()
@@ -129,7 +148,7 @@ class Transformer(lark.Transformer):
 
 
 Expr = (
-    Tag | And | Or | Xor | Not | Null | WildcardSingle | WildcardPath | WildcardBounded
+    Tag | And | Or | Xor | OnlyOne | Not | Null | WildcardSingle | WildcardPath | WildcardBounded
 )
 
 p = parser.parse

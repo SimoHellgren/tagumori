@@ -21,7 +21,8 @@ start: query
 query: xor_expr
 
 // XOR
-xor_expr: or_expr ("^" or_expr)*
+xor_expr: or_expr ("^" or_expr)*  // binary XOR
+        | XOR_KW "(" unary_expr ("," unary_expr)+ ")"  -> only_one  // exactly one of
 
 // OR
 or_expr: and_expr ("|" and_expr)*
@@ -40,7 +41,8 @@ and_expr: unary_expr ("," unary_expr)*
        | tag_expr
 
 // Tag with optional children
-tag_expr: NAME ("[" query "]")?  -> tag
+tag_expr: NAME ("[" query "]")?    -> tag
+        | XOR_KW ("[" query "]")?  -> tag_xor  // allow "xor" as a tag name
 
 // Wildcards (all can have optional children)
 wildcard: DOUBLE_STAR ("[" query "]")?      -> wildcard_path
@@ -61,6 +63,7 @@ wildcard: DOUBLE_STAR ("[" query "]")?      -> wildcard_path
 //   (?:[^|,()[\]^]*       - middle: anything except delimiters or ^ (allows spaces)
 //      [^|,()[\]^\s])?    - last char: not delimiter, ^, or whitespace (trims end)
 //
+XOR_KW.2: "xor"  // keyword XOR - higher priority than NAME
 NAME: /[^!~*^|,()[\]\s](?:[^|,()[\]^]*[^|,()[\]^\s])?/
 NULL: "~"
 SINGLE_STAR: "*"
