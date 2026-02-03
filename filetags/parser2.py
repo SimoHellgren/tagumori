@@ -166,6 +166,25 @@ Expr = (
 )
 
 
+def validate_for_storage(node: Expr) -> bool:
+    """Returns True if the AST only contains 'Tag' and 'And',
+    since those are the only kind that are valid for storage.
+    """
+
+    match node:
+        case Tag(_, None):
+            return True
+
+        case Tag(_, children):
+            return validate_for_storage(children)
+
+        case And(operands):
+            return all(map(validate_for_storage, operands))
+
+        case _:
+            return False
+
+
 # Query plan stuff
 @dataclass
 class SegmentTag:
@@ -376,6 +395,8 @@ if __name__ == "__main__":
 
     ast = t(p(x))
     print(ast)
+
+    print("Valid for storage:", validate_for_storage(ast))
 
     qp = to_query_plan(ast)
     print(qp)
