@@ -296,12 +296,89 @@ def to_query_plan(node: Expr, prefix: list[Segment] | None = None) -> QueryPlan:
             return QP_Not(inner)
 
 
+def simplify(qp: QueryPlan) -> QueryPlan:
+    match qp:
+        case TagPath():
+            # base case, nothing to simplify
+            return qp
+
+        case QP_Not(QP_Not(inner)):
+            # double negation
+            return simplify(inner)
+
+        case QP_Not(operand):
+            return QP_Not(simplify(operand))
+
+        case QP_And(operands):
+            # simplify children
+            simplified = map(simplify, operands)
+
+            # flatten nested: AND(AND(a,b), c) -> AND(a,b,c)
+            flattened = []
+            for op in simplified:
+                if isinstance(op, QP_And):
+                    flattened.extend(op.operands)
+                else:
+                    flattened.append(op)
+
+            # unwrap single: AND(a) -> a
+            if len(flattened) == 1:
+                return flattened[0]
+
+            return QP_And(flattened)
+
+        case QP_Or(operands):
+            # simplify children
+            simplified = map(simplify, operands)
+
+            # flatten nested: OR(OR(a,b), c) -> OR(a,b,c)
+            flattened = []
+            for op in simplified:
+                if isinstance(op, QP_Or):
+                    flattened.extend(op.operands)
+                else:
+                    flattened.append(op)
+
+            # unwrap single: OR(a) -> a
+            if len(flattened) == 1:
+                return flattened[0]
+
+            return QP_Or(flattened)
+
+        case QP_Xor(operands):
+            simplified = list(map(simplify, operands))
+
+            # unwrap single: XOR(a) -> a
+            if len(simplified) == 1:
+                return simplified[0]
+
+            return QP_Xor(simplified)
+
+        case QP_OnlyOne(operands):
+            simplified = list(map(simplify, operands))
+
+            # unwrap single: OnlyOne(a) -> a
+            if len(simplified) == 1:
+                return simplified[0]
+
+            return QP_OnlyOne(simplified)
+
+        case _:
+            raise ValueError(f"Unknown: {type(qp)}")
+
+
 if __name__ == "__main__":
     p = parser.parse
     t = Transformer().transform
     import sys
 
     x = sys.argv[1]
+
     ast = t(p(x))
     print(ast)
-    print(to_query_plan(ast))
+
+    qp = to_query_plan(ast)
+    print(qp)
+
+    simplified = simplify(qp)
+    print(simplified)
