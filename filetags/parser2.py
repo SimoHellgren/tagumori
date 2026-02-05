@@ -386,6 +386,94 @@ def simplify(qp: QueryPlan) -> QueryPlan:
             raise ValueError(f"Unknown: {type(qp)}")
 
 
+import sqlite3  # noqa
+from itertools import chain  # noqa
+from filetags import crud  # noqa
+from functools import reduce, partial  # noqa
+from collections import Counter  # noqa
+
+flatten = chain.from_iterable
+
+
+def find_all(conn, path):
+    values_ph = ", ".join("(?,?)" for _ in path)
+    # enumerate to get positions / depth
+    values = tuple(flatten(enumerate(path, 1)))
+
+    q = f"""
+        WITH path(depth, tag_name) AS (
+            VALUES {values_ph}
+        ),
+
+        match(file_id, id, depth) AS (
+            SELECT
+                file_tag.file_id,
+                file_tag.id,
+                1
+            FROM file_tag
+            JOIN tag ON tag.id = file_tag.tag_id
+            JOIN path
+                ON path.depth = 1
+                AND path.tag_name = tag.name
+
+            UNION ALL
+
+            SELECT
+                child.file_id,
+                child.id,
+                parent.depth + 1
+            FROM match parent
+            JOIN file_tag child
+                ON child.parent_id = parent.id
+                AND child.file_id = parent.file_id
+            JOIN tag ON child.tag_id = tag.id
+            JOIN path
+                ON path.depth = parent.depth + 1
+                AND path.tag_name = tag.name 
+        )
+
+        SELECT DISTINCT file_id FROM match 
+        WHERE depth = (SELECT MAX(depth) FROM path)
+    """
+    return {x["file_id"] for x in conn.execute(q, values).fetchall()}
+
+
+# missing: wilcard handling, recursive matches (** & *n*), case insensitive
+def execute(conn: sqlite3.Connection, qp: QueryPlan):
+    match qp:
+        case TagPath(segments):
+            path = [s.name for s in segments]
+
+            vals = find_all(conn, path)
+            print(f"{vals=}")
+            return vals
+
+        case QP_And(operands):
+            # short circuit if any set is empty
+            first, *rest = operands
+            result = execute(conn, first)
+            for op in rest:
+                if not result:
+                    return set()
+                result &= execute(conn, op)
+            return result
+
+        case QP_Or(operands):
+            # short circuit technically possible, but would require identifying
+            # when "all" records were returned
+            return set.union(*(execute(conn, op) for op in operands))
+
+        case QP_Xor(operands):
+            return reduce(lambda a, b: a ^ b, (execute(conn, op) for op in operands))
+
+        case QP_OnlyOne(operands):
+            c = Counter(flatten(execute(conn, op) for op in operands))
+            return {x for x, count in c.items() if count == 1}
+
+        case QP_Not(operand):
+            return NotImplemented
+
+
 if __name__ == "__main__":
     p = parser.parse
     t = Transformer().transform
@@ -403,3 +491,12 @@ if __name__ == "__main__":
 
     simplified = simplify(qp)
     print(simplified)
+
+    with sqlite3.connect("vault.db") as conn:
+        conn.row_factory = sqlite3.Row
+        res = execute(conn, simplified)
+        files = crud.file.get_many(conn, list(res))
+
+    print(res)
+    for f in files:
+        print(f["path"])
