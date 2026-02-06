@@ -395,16 +395,29 @@ from collections import Counter  # noqa
 flatten = chain.from_iterable
 
 
-def find_all(conn, path, case):
-    values_ph = ", ".join("(?,?)" for _ in path)
-    # enumerate to get positions / depth
-    values = tuple(flatten(enumerate(path, 1)))
+def _build_value(segment: Segment):
+    """Returns pairs of (name, is_any)"""
+    match segment:
+        case SegmentTag(name):
+            return (name, 0)
+        case SegmentWildCardSingle():
+            return (None, 1)
+
+
+def find_all(conn, path: TagPath, case):
+    values_ph = ", ".join("(?,?,?)" for _ in path)
+
+    # build values
+    rows = (
+        (i, name, is_any) for i, (name, is_any) in enumerate(map(_build_value, path), 1)
+    )
+    values = tuple(flatten(rows))
 
     # configure case sensitivity
     collate_clause = "" if case else "COLLATE NOCASE"
 
     q = f"""
-        WITH path(depth, tag_name) AS (
+        WITH path(depth, tag_name, is_any) AS (
             VALUES {values_ph}
         ),
 
@@ -417,7 +430,11 @@ def find_all(conn, path, case):
             JOIN tag ON tag.id = file_tag.tag_id
             JOIN path
                 ON path.depth = 1
-                AND path.tag_name = tag.name {collate_clause}
+                AND (
+                    path.tag_name = tag.name {collate_clause}
+                    OR
+                    path.is_any = 1 --wilcard (*) 
+                )
 
             UNION ALL
 
@@ -432,7 +449,11 @@ def find_all(conn, path, case):
             JOIN tag ON child.tag_id = tag.id
             JOIN path
                 ON path.depth = parent.depth + 1
-                AND path.tag_name = tag.name {collate_clause}
+                AND (
+                    path.tag_name = tag.name {collate_clause}
+                    OR
+                    path.is_any = 1 --wilcard (*) 
+                )
         )
 
         SELECT DISTINCT file_id FROM match 
@@ -447,8 +468,7 @@ def execute(conn: sqlite3.Connection, qp: QueryPlan, case: bool = True):
     _exec = partial(execute, conn, case=case)
     match qp:
         case TagPath(segments):
-            path = [s.name for s in segments]
-            return find_all(conn, path, case)
+            return find_all(conn, segments, case)
 
         case QP_And(operands):
             # short circuit if any set is empty
