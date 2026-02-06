@@ -189,13 +189,16 @@ def validate_for_storage(node: Expr) -> bool:
 @dataclass
 class SegmentTag:
     name: str
+    is_root: bool = False
+    is_leaf: bool = False
 
 
 @dataclass
 class SegmentWildCardSingle:
     """Matches any single tag (*)"""
 
-    pass
+    is_root: bool = False
+    is_leaf: bool = False
 
 
 @dataclass
@@ -261,23 +264,40 @@ class QP_Not:
 QueryPlan = QP_And | QP_Or | QP_Xor | QP_OnlyOne | QP_Not | TagPath
 
 
-def to_query_plan(node: Expr, prefix: list[Segment] | None = None) -> QueryPlan:
+def to_query_plan(
+    node: Expr, prefix: list[Segment] | None = None, is_root: bool = False
+) -> QueryPlan:
     prefix = prefix or []
     match node:
         case Tag(name, None):
-            return TagPath(prefix + [SegmentTag(name)])
+            return TagPath(prefix + [SegmentTag(name, is_root=is_root)])
 
         case Tag(name, children):
-            return to_query_plan(children, prefix + [SegmentTag(name)])
+            is_leaf = isinstance(children, Null)
+            seg = SegmentTag(name, is_root=is_root, is_leaf=is_leaf)
+
+            if is_leaf:
+                # if ~ encountered in children, terminate recursion
+                # (this means that a[~[z]] is just a[~] and kind of fails silently)
+                return TagPath(prefix + [seg])
+
+            return to_query_plan(children, prefix + [seg])
 
         case WildcardSingle(None):
             return TagPath(prefix + [SegmentWildCardSingle()])
 
         case WildcardSingle(children):
-            return to_query_plan(children, prefix + [SegmentWildCardSingle()])
+            is_leaf = isinstance(children, Null)
+            seg = SegmentWildCardSingle(is_root=is_root, is_leaf=is_leaf)
+
+            if is_leaf:
+                # see case Tag(name, children)
+                return TagPath(prefix + [seg])
+
+            return to_query_plan(children, prefix + [seg])
 
         case WildcardPath(None):
-            return TagPath(prefix + [SegmentWildCardPath()])
+            return TagPath(prefix + [SegmentWildCardPath(is_root=is_root)])
 
         case WildcardPath(children):
             return to_query_plan(children, prefix + [SegmentWildCardPath()])
@@ -289,25 +309,27 @@ def to_query_plan(node: Expr, prefix: list[Segment] | None = None) -> QueryPlan:
             return to_query_plan(children, prefix + [SegmentWildCardBounded(max_depth)])
 
         case Null(None):
-            return TagPath(prefix + [SegmentNull()])
+            # ~ alone: any root-level leaf
+            return TagPath(prefix + [SegmentWildCardSingle(is_root=True, is_leaf=True)])
 
         case Null(children):
-            return to_query_plan(children, prefix + [SegmentNull()])
+            # ~[X]: X must be a root
+            return to_query_plan(children, prefix, is_root=True)
 
         case Or(operands):
-            return QP_Or([to_query_plan(op, prefix) for op in operands])
+            return QP_Or([to_query_plan(op, prefix, is_root) for op in operands])
 
         case And(operands):
-            return QP_And([to_query_plan(op, prefix) for op in operands])
+            return QP_And([to_query_plan(op, prefix, is_root) for op in operands])
 
         case Xor(operands):
-            return QP_Xor([to_query_plan(op, prefix) for op in operands])
+            return QP_Xor([to_query_plan(op, prefix, is_root) for op in operands])
 
         case OnlyOne(operands):
-            return QP_OnlyOne([to_query_plan(op, prefix) for op in operands])
+            return QP_OnlyOne([to_query_plan(op, prefix, is_root) for op in operands])
 
         case Not(operand):
-            inner = to_query_plan(operand, prefix)
+            inner = to_query_plan(operand, prefix, is_root)
             if prefix:
                 # a[!b] == a,!a[b]
                 return QP_And([TagPath(prefix), QP_Not(inner)])
@@ -398,26 +420,24 @@ flatten = chain.from_iterable
 def _build_value(segment: Segment):
     """Returns pairs of (name, is_any)"""
     match segment:
-        case SegmentTag(name):
-            return (name, 0)
-        case SegmentWildCardSingle():
-            return (None, 1)
+        case SegmentTag(name, is_root, is_leaf):
+            return (name, 0, is_root, is_leaf)
+        case SegmentWildCardSingle(is_root, is_leaf):
+            return (None, 1, is_root, is_leaf)
 
 
 def find_all(conn, path: TagPath, case):
-    values_ph = ", ".join("(?,?,?)" for _ in path)
+    values_ph = ", ".join("(?,?,?,?,?)" for _ in path)
 
     # build values
-    rows = (
-        (i, name, is_any) for i, (name, is_any) in enumerate(map(_build_value, path), 1)
-    )
+    rows = ((i, *vals) for i, vals in enumerate(map(_build_value, path), 1))
     values = tuple(flatten(rows))
 
     # configure case sensitivity
     collate_clause = "" if case else "COLLATE NOCASE"
 
     q = f"""
-        WITH path(depth, tag_name, is_any) AS (
+        WITH path(depth, tag_name, is_any, is_root, is_leaf) AS (
             VALUES {values_ph}
         ),
 
@@ -434,6 +454,12 @@ def find_all(conn, path: TagPath, case):
                     path.tag_name = tag.name {collate_clause}
                     OR
                     path.is_any = 1 --wilcard (*) 
+                )
+                AND (
+                    -- root check
+                    path.is_root = 0
+                    OR
+                    file_tag.parent_id IS NULL
                 )
 
             UNION ALL
