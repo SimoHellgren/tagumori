@@ -92,12 +92,11 @@ def info(vault: LazyVault, files: Sequence[Path], inode: int):
 
     for path, data in files_with_tags.items():
         record = data["file"]
-        roots = data["roots"]
 
         print_box(
             str(path),
             [
-                f"Tags: {','.join(str(root) for root in roots)}",
+                f"Tags: {data['ast'] or ''}",
                 "Path: " + click.style(**check_path(path)),
                 "Inode/device: " + click.style(**check_inode(path, record)),
             ],
