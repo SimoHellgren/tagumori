@@ -1,3 +1,4 @@
+from collections import defaultdict
 from pathlib import Path
 from sqlite3 import Connection, Row
 
@@ -5,7 +6,7 @@ from filetags import crud
 from filetags.models.node import Node
 from filetags.query import parse_for_storage, search
 from filetags.query.ast import And, Expr, Tag
-from filetags.utils import compile_pattern, flatten
+from filetags.utils import compile_pattern
 
 
 def attach_tree(
@@ -25,11 +26,11 @@ def attach_tree(
 
 
 def add_tags_to_files(
-    conn: Connection, files: list[Path], node: list[str], apply_tagalongs: bool = True
+    conn: Connection, files: list[Path], tags: list[str], apply_tagalongs: bool = True
 ):
     file_ids = [x["id"] for x in crud.file.get_or_create_many(conn, files)]
 
-    tag_expr = ",".join(node)
+    tag_expr = ",".join(tags)
     node = parse_for_storage(tag_expr)
 
     for file_id in file_ids:
@@ -88,21 +89,47 @@ def build_tree(file_tags: list) -> list[Node]:
     return roots
 
 
+def _db_tags_to_paths(file_tags: list[Row]) -> set[tuple[str, ...]]:
+    roots = []
+    children = defaultdict(list)
+
+    for row in file_tags:
+        parent = row["parent_id"]
+        target = roots if parent is None else children[parent]
+        target.append(row)
+
+    paths = []
+
+    def walk(row, prefix):
+        path = prefix + (row["name"],)
+        kids = children[row["id"]]
+        if not kids:
+            paths.append(path)
+        else:
+            for kid in kids:
+                walk(kid, path)
+
+    for root in roots:
+        walk(root, ())
+
+    return set(paths)
+
+
 def set_tags_on_files(
-    conn: Connection, files: list[Path], tag: Node, apply_tagalongs: bool = True
+    conn: Connection, files: list[Path], tags: Expr, apply_tagalongs: bool = True
 ):
+    tag_expr = ",".join(tags)
+    node = parse_for_storage(tag_expr)
+
     # remove unwanted paths
-    _, *nodes = tag.preorder()
-    desired_paths = set(tuple(n.path()[1:]) for n in nodes)
+    desired_paths = set(_ast_to_paths(node))
 
     file_ids = [x["id"] for x in crud.file.get_or_create_many(conn, files)]
 
     for file_id in file_ids:
-        tags = crud.file_tag.get_by_file_id(conn, file_id)
+        db_tags = crud.file_tag.get_by_file_id(conn, file_id)
 
-        roots = build_tree(tags)
-        db_nodes = flatten(n.preorder() for n in roots)
-        existing_paths = set(n.path() for n in db_nodes)
+        existing_paths = _db_tags_to_paths(db_tags)
 
         paths_to_delete = existing_paths - desired_paths
         for path in paths_to_delete:
@@ -110,7 +137,8 @@ def set_tags_on_files(
             crud.file_tag.detach(conn, file_tag_id)
 
     # attach new tags - done after removal so new tagalongs aren't nuked.
-    add_tags_to_files(conn, files, tag.children, apply_tagalongs)
+    # add_tags_to_files evaluates ´tags´ as well, so there's a bit of double work here.
+    add_tags_to_files(conn, files, tags, apply_tagalongs)
 
 
 def drop_file_tags(conn: Connection, files: list[Path], retain_file: bool = False):

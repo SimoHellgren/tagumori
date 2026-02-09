@@ -5,9 +5,7 @@ import click
 from filetags import service
 from filetags.commands import db, file, query, tag, tagalong
 from filetags.commands.context import LazyVault
-from filetags.models.node import Node
-from filetags.parser import parse
-from filetags.utils import flatten, format_file_output
+from filetags.utils import format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
 
@@ -91,10 +89,9 @@ def remove(vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...]):
 def set_(
     vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...], tagalongs: bool
 ):
-    root = Node("root", list(flatten(parse(t).children for t in tags)))
 
     with vault as conn:
-        service.set_tags_on_files(conn, files, root, tagalongs)
+        service.set_tags_on_files(conn, files, tags, tagalongs)
 
 
 @cli.command(help="Drop files' tags")
