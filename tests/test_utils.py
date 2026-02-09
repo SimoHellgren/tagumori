@@ -1,22 +1,4 @@
-from filetags.utils import compile_pattern, drop, tail
-
-
-def test_drop():
-    data = [1, 2, 3, 4, 5]
-
-    assert list(drop(data, 0)) == data
-    assert list(drop(data, 1)) == data[1:]
-    assert list(drop(data, 2)) == data[2:]
-    assert list(drop(data, len(data))) == []
-    assert list(drop(data, 100)) == []
-
-
-def test_tail():
-    data = [1, 2, 3, 4, 5]
-
-    assert list(tail(data)) == data[1:]
-
-    assert list(tail([])) == []
+from filetags.utils import compile_pattern
 
 
 def test_compile_pattern_basic():

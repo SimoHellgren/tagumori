@@ -1,0 +1,75 @@
+// Tag Query DSL Grammar
+// 
+// Operators (by precedence, highest first):
+//   !       Negation
+//   ,       Conjunction (AND)
+//   |       Disjunction (OR)
+//   ^       Exclusive or (XOR)
+//
+// Primitives:
+//   name    Tag exists
+//   name[E] Tag with children matching E
+//   ~       Null (leaf when inside brackets, root when outside)
+//   *       Single wildcard (any single node)
+//   **      Path wildcard (any path, zero or more nodes)
+//   *n*     Bounded wildcard (any path of at most n nodes)
+
+// Entry point
+start: query
+
+// Main query expression - lowest precedence is XOR
+query: xor_expr
+
+// XOR
+xor_expr: or_expr ("^" or_expr)*  // binary XOR
+        | XOR_KW "(" unary_expr ("," unary_expr)+ ")"  -> only_one  // exactly one of
+
+// OR
+or_expr: and_expr ("|" and_expr)*
+
+// AND
+and_expr: unary_expr ("," unary_expr)*
+
+// Negation
+?unary_expr: "!" unary_expr  -> negation
+          | primary
+
+// Primary expressions
+?primary: "(" query ")"                          -> grouped
+       | NULL ("[" query "]")?                  -> null_expr
+       | wildcard
+       | tag_expr
+
+// Tag with optional children
+tag_expr: NAME ("[" query "]")?    -> tag
+        | XOR_KW ("[" query "]")?  -> tag_xor  // allow "xor" as a tag name
+
+// Wildcards (all can have optional children)
+wildcard: DOUBLE_STAR ("[" query "]")?      -> wildcard_path
+        | BOUNDED_WILDCARD ("[" query "]")? -> wildcard_bounded
+        | SINGLE_STAR ("[" query "]")?      -> wildcard_single
+
+// Terminals
+// NAME: Unicode-aware, allows spaces in the middle
+// - Must not start with: ! ~ * ^ (prefix operators)
+// - Must not contain: | , ( ) [ ] ^ (delimiters and operators)
+// - Edges are trimmed (no leading/trailing whitespace)
+// - Single char names, or multi-char with possible internal spaces
+// 
+// Examples: "actor", "Will Smith", "café", "日本語", "foo-bar_baz"
+// 
+// Regex breakdown:
+//   [^!~*^|,()[\]\s]      - first char: not operator, delimiter, or whitespace
+//   (?:[^|,()[\]^]*       - middle: anything except delimiters or ^ (allows spaces)
+//      [^|,()[\]^\s])?    - last char: not delimiter, ^, or whitespace (trims end)
+//
+XOR_KW.2: "xor"  // keyword XOR - higher priority than NAME
+NAME: /[^!~*^|,()[\]\s](?:[^|,()[\]^]*[^|,()[\]^\s])?/
+NULL: "~"
+SINGLE_STAR: "*"
+DOUBLE_STAR: "**"
+BOUNDED_WILDCARD: "*" /[0-9]+/ "*"
+
+// Whitespace handling
+%import common.WS
+%ignore WS

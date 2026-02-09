@@ -5,9 +5,7 @@ import click
 from filetags import service
 from filetags.commands import db, file, query, tag, tagalong
 from filetags.commands.context import LazyVault
-from filetags.models.node import Node
-from filetags.parser import parse
-from filetags.utils import flatten, format_file_output
+from filetags.utils import format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
 
@@ -53,10 +51,8 @@ def add(
     tags: tuple[str, ...],
     tagalongs: bool,
 ):
-    root_tags = list(flatten(parse(t).children for t in tags))
-
     with vault as conn:
-        service.add_tags_to_files(conn, files, root_tags, tagalongs)
+        service.add_tags_to_files(conn, files, tags, tagalongs)
 
 
 @cli.command(help="Remove tags from files")
@@ -70,10 +66,8 @@ def add(
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
 @click.pass_obj
 def remove(vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...]):
-    root_tags = list(flatten(parse(t).children for t in tags))
-
     with vault as conn:
-        service.remove_tags_from_files(conn, files, root_tags)
+        service.remove_tags_from_files(conn, files, tags)
 
 
 @cli.command(help="Replace tags on files", name="set")
@@ -95,10 +89,9 @@ def remove(vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...]):
 def set_(
     vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...], tagalongs: bool
 ):
-    root = Node("root", list(flatten(parse(t).children for t in tags)))
 
     with vault as conn:
-        service.set_tags_on_files(conn, files, root, tagalongs)
+        service.set_tags_on_files(conn, files, tags, tagalongs)
 
 
 @cli.command(help="Drop files' tags")
@@ -149,20 +142,14 @@ def ls(
     relative_to: Path,
     prefix: str,
 ):
-    # parse nodes
-    select_nodes = [parse(n) for n in select]
-    exclude_nodes = [parse(n) for n in exclude]
-
-    # TODO: some double-fetching here, still, but better than before
-    # TODO: if not --long, could no need to fetch tags.
+    # TODO: could potentially fetch tags already in service
     with vault as conn:
         paths = service.execute_query(
-            conn, select_nodes, exclude_nodes, pattern, ignore_case, invert_match
+            conn, select, exclude, pattern, ignore_case, invert_match
         )
 
         if long:
             files_with_tags = service.get_files_with_tags(conn, paths)
-
         else:
             files_with_tags = {f: {} for f in paths}
 

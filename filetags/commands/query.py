@@ -101,8 +101,6 @@ def run(
 ):
     import json
 
-    from filetags.parser import parse
-
     with vault as conn:
         queries = crud.query.get_all(conn)
 
@@ -110,13 +108,13 @@ def run(
             if not re.match(pattern, query["name"]):
                 continue
 
-            select_nodes = [parse(n) for n in json.loads(query["select_tags"])]
-            exclude_nodes = [parse(n) for n in json.loads(query["exclude_tags"])]
+            select_strs = json.loads(query["select_tags"])
+            exclude_strs = json.loads(query["exclude_tags"])
 
             paths = service.execute_query(
                 conn,
-                select_nodes,
-                exclude_nodes,
+                select_strs,
+                exclude_strs,
                 query["pattern"],
                 bool(query["ignore_case"]),
                 bool(query["invert_match"]),

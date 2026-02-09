@@ -1,17 +1,12 @@
-from collections.abc import Sequence
 from sqlite3 import Connection, Row
 
-from filetags.crud.base import _placeholders
-from filetags.models.node import Node
-from filetags.utils import flatten
 
-
-def resolve_path(conn: Connection, file_id: int, path: tuple[Node, ...]) -> int:
+def resolve_path(conn: Connection, file_id: int, path: tuple[str, ...]) -> int:
     """Finds the lowest node of a path and returns file_tag.id if said path exists for file."""
     # TODO: this could probably be implemented as a special case of find_all, or at
     # least utilize similar recursive logic.
     parent_id = None
-    for node in path:
+    for tag in path:
         row = conn.execute(
             """
             SELECT file_tag.id
@@ -25,7 +20,7 @@ def resolve_path(conn: Connection, file_id: int, path: tuple[Node, ...]) -> int:
             )
                     
         """,
-            (file_id, node.value, parent_id, parent_id),
+            (file_id, tag, parent_id, parent_id),
         ).fetchone()
 
         if not row:
@@ -35,47 +30,6 @@ def resolve_path(conn: Connection, file_id: int, path: tuple[Node, ...]) -> int:
 
     return parent_id
 
-
-def find_all(conn: Connection, path: Sequence[Node]) -> list[Row]:
-    values = _placeholders(len(path), "(?,?)")
-
-    q = f"""
-        WITH path(depth, tag_name) AS (
-            VALUES {values}
-        ),
-
-        match(file_id, id, depth) AS (
-            SELECT
-                file_tag.file_id,
-                file_tag.id,
-                1
-            FROM file_tag
-            JOIN tag ON tag.id = file_tag.tag_id
-            JOIN path
-                ON path.depth = 1
-                AND path.tag_name = tag.name
-
-            UNION ALL
-
-            SELECT
-                child.file_id,
-                child.id,
-                parent.depth + 1
-            FROM match parent
-            JOIN file_tag child
-                ON child.parent_id = parent.id
-                AND child.file_id = parent.file_id
-            JOIN tag ON child.tag_id = tag.id
-            JOIN path
-                ON path.depth = parent.depth + 1
-                AND path.tag_name = tag.name 
-        )
-
-        SELECT DISTINCT file_id FROM match 
-        WHERE depth = (SELECT MAX(depth) FROM path)
-    """
-    tags = (n.value for n in path)
-    return conn.execute(q, tuple(flatten(enumerate(tags, 1)))).fetchall()
 
 
 def get_by_file_id(conn: Connection, file_id: int) -> list[Row]:

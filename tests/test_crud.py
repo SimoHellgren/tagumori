@@ -563,9 +563,7 @@ class TestCascadeDeletes:
 
 
 class TestFileTagPaths:
-    """Tests for resolve_path and find_all."""
-
-    from filetags.models.node import Node
+    """Tests for resolve_path."""
 
     @pytest.fixture
     def file_with_tag_tree(self, conn):
@@ -588,10 +586,8 @@ class TestFileTagPaths:
 
     def test_resolve_path_full(self, conn, file_with_tag_tree):
         """resolve_path returns the file_tag id of the last node in the path."""
-        from filetags.models.node import Node
-
         file_id = file_with_tag_tree["file_id"]
-        path = (Node("genre"), Node("rock"), Node("classic"))
+        path = ("genre", "rock", "classic")
 
         result = crud.file_tag.resolve_path(conn, file_id, path)
 
@@ -599,10 +595,8 @@ class TestFileTagPaths:
 
     def test_resolve_path_partial(self, conn, file_with_tag_tree):
         """resolve_path works for partial paths."""
-        from filetags.models.node import Node
-
         file_id = file_with_tag_tree["file_id"]
-        path = (Node("genre"), Node("rock"))
+        path = ("genre", "rock")
 
         result = crud.file_tag.resolve_path(conn, file_id, path)
 
@@ -610,10 +604,8 @@ class TestFileTagPaths:
 
     def test_resolve_path_root_only(self, conn, file_with_tag_tree):
         """resolve_path works for root-only path."""
-        from filetags.models.node import Node
-
         file_id = file_with_tag_tree["file_id"]
-        path = (Node("genre"),)
+        path = ("genre",)
 
         result = crud.file_tag.resolve_path(conn, file_id, path)
 
@@ -621,10 +613,8 @@ class TestFileTagPaths:
 
     def test_resolve_path_not_found(self, conn, file_with_tag_tree):
         """resolve_path returns None if path doesn't exist."""
-        from filetags.models.node import Node
-
         file_id = file_with_tag_tree["file_id"]
-        path = (Node("genre"), Node("jazz"))  # jazz doesn't exist
+        path = ("genre", "jazz")  # jazz doesn't exist
 
         result = crud.file_tag.resolve_path(conn, file_id, path)
 
@@ -632,10 +622,8 @@ class TestFileTagPaths:
 
     def test_resolve_path_wrong_order(self, conn, file_with_tag_tree):
         """resolve_path returns None if path is in wrong order."""
-        from filetags.models.node import Node
-
         file_id = file_with_tag_tree["file_id"]
-        path = (Node("rock"), Node("genre"))  # wrong order
+        path = ("rock", "genre")  # wrong order
 
         result = crud.file_tag.resolve_path(conn, file_id, path)
 
@@ -648,67 +636,3 @@ class TestFileTagPaths:
         result = crud.file_tag.resolve_path(conn, file_id, ())
 
         assert result is None
-
-    def test_find_all_single_file(self, conn, file_with_tag_tree):
-        """find_all returns file_ids matching the path."""
-        from filetags.models.node import Node
-
-        path = [Node("genre"), Node("rock")]
-
-        result = crud.file_tag.find_all(conn, path)
-
-        file_ids = {r["file_id"] for r in result}
-        assert file_ids == {file_with_tag_tree["file_id"]}
-
-    def test_find_all_multiple_files(self, conn):
-        """find_all returns all files matching the path."""
-        from filetags.models.node import Node
-
-        # Create two files with same tag path
-        file1 = crud.file.get_or_create(conn, Path("song1.mp3"))
-        file2 = crud.file.get_or_create(conn, Path("song2.mp3"))
-        rock = crud.tag.create(conn, "rock")
-
-        crud.file_tag.attach(conn, file1["id"], rock["id"])
-        crud.file_tag.attach(conn, file2["id"], rock["id"])
-
-        path = [Node("rock")]
-        result = crud.file_tag.find_all(conn, path)
-
-        file_ids = {r["file_id"] for r in result}
-        assert file_ids == {file1["id"], file2["id"]}
-
-    def test_find_all_no_match(self, conn, file_with_tag_tree):
-        """find_all returns empty list if no files match."""
-        from filetags.models.node import Node
-
-        path = [Node("jazz")]
-
-        result = crud.file_tag.find_all(conn, path)
-
-        assert result == []
-
-    def test_find_all_filters_by_full_path(self, conn):
-        """find_all only matches files with the complete path."""
-        from filetags.models.node import Node
-
-        # file1: genre -> rock
-        # file2: genre -> jazz
-        file1 = crud.file.get_or_create(conn, Path("rock.mp3"))
-        file2 = crud.file.get_or_create(conn, Path("jazz.mp3"))
-        genre = crud.tag.create(conn, "genre")
-        rock = crud.tag.create(conn, "rock")
-        jazz = crud.tag.create(conn, "jazz")
-
-        genre_ft1 = crud.file_tag.attach(conn, file1["id"], genre["id"])
-        crud.file_tag.attach(conn, file1["id"], rock["id"], genre_ft1)
-
-        genre_ft2 = crud.file_tag.attach(conn, file2["id"], genre["id"])
-        crud.file_tag.attach(conn, file2["id"], jazz["id"], genre_ft2)
-
-        # Search for genre -> rock should only find file1
-        path = [Node("genre"), Node("rock")]
-        result = crud.file_tag.find_all(conn, path)
-
-        file_ids = {r["file_id"] for r in result}
-        assert file_ids == {file1["id"]}
