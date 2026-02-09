@@ -1,20 +1,11 @@
 import re
-from itertools import chain, islice
+from itertools import chain
 from pathlib import Path
-from typing import Generator, Iterator
+from typing import Generator
 
 import click
 
 flatten = chain.from_iterable
-find = lambda f, it, d=None: next(filter(f, it), d)
-
-
-def drop(it: Iterator, n: int):
-    return islice(it, n, None)
-
-
-def tail(it: Iterator):
-    return drop(it, 1)
 
 
 def compile_pattern(pattern: str, ignore_case: bool):
