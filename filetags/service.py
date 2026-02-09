@@ -3,6 +3,7 @@ from sqlite3 import Connection, Row
 
 from filetags import crud
 from filetags.models.node import Node
+from filetags.query import search
 from filetags.utils import compile_pattern, flatten
 
 
@@ -139,13 +140,23 @@ def search_files(conn: Connection, select_tags: list[Node], exclude_tags: list[N
 
 def execute_query(
     conn: Connection,
-    select_tags: list[Node],
-    exclude_tags: list[Node],
+    select_strs: list[str],
+    exclude_strs: list[str],
     pattern: str = ".*",
     ignore_case: bool = False,
     invert_match: bool = False,
 ) -> list[Path]:
-    files = search_files(conn, select_tags, exclude_tags)
+
+    selects = "|".join(select_strs)
+    excludes = "|".join(exclude_strs)
+
+    query_str = selects + (f",!{excludes}" if excludes else "")
+
+    if query_str:
+        ids = search(conn, query_str, True)
+        files = crud.file.get_many(conn, list(ids))
+    else:
+        files = crud.file.get_all(conn)
 
     regex = compile_pattern(pattern, ignore_case)
 

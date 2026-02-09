@@ -149,15 +149,10 @@ def ls(
     relative_to: Path,
     prefix: str,
 ):
-    # parse nodes
-    select_nodes = [parse(n) for n in select]
-    exclude_nodes = [parse(n) for n in exclude]
-
-    # TODO: some double-fetching here, still, but better than before
-    # TODO: if not --long, could no need to fetch tags.
+    # TODO: could potentially fetch tags already in service
     with vault as conn:
         paths = service.execute_query(
-            conn, select_nodes, exclude_nodes, pattern, ignore_case, invert_match
+            conn, select, exclude, pattern, ignore_case, invert_match
         )
 
         if long:
