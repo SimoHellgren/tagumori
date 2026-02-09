@@ -3,7 +3,6 @@ from pathlib import Path
 from sqlite3 import Connection, Row
 
 from filetags import crud
-from filetags.models.node import Node
 from filetags.query import parse_for_storage, search
 from filetags.query.ast import And, Expr, Tag
 from filetags.utils import compile_pattern
@@ -146,36 +145,6 @@ def get_files_with_tags(conn: Connection, files: list[Path]) -> dict[Path, Expr]
     return {
         Path(f["path"]): {"file": f, "ast": ast} for f, ast in zip(file_records, asts)
     }
-
-
-def _find_files_matching_all_paths(conn: Connection, node: Node) -> set[int]:
-    matches = []
-    for _, *p in node.paths_down():
-        file_ids = {x["file_id"] for x in crud.file_tag.find_all(conn, p)}
-        matches.append(file_ids)
-
-    return set.intersection(*matches)
-
-
-def search_files(conn: Connection, select_tags: list[Node], exclude_tags: list[Node]):
-    if select_tags:
-        include_ids = set.union(
-            set(), *(_find_files_matching_all_paths(conn, n) for n in select_tags)
-        )
-    else:
-        # fallback to all ids if no select_tags provided
-        # TODO: when grammar gets improved, could just default to -s "*" in the cli instead.
-        include_ids = set(x["id"] for x in crud.file.get_all(conn))
-
-    exclude_ids = set.union(
-        set(), *(_find_files_matching_all_paths(conn, n) for n in exclude_tags)
-    )
-
-    ids = tuple(include_ids - exclude_ids)
-
-    files = crud.file.get_many(conn, ids)
-
-    return sorted(files, key=lambda x: x["path"])
 
 
 def execute_query(

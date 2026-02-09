@@ -1,14 +1,4 @@
 from filetags import service
-from filetags.models.node import Node
-
-
-def tag(name: str) -> Node:
-    """Helper to create a root node with a single tag child.
-
-    This is a quirk of how expressions are parsed. Will likely fix when
-    working on the grammar.
-    """
-    return Node("root", [Node(name)])
 
 
 class TestSearchFiles:
@@ -17,11 +7,9 @@ class TestSearchFiles:
         file = tmp_path / "file.txt"
         file.write_text("")
 
-        service.add_tags_to_files(conn, [file], [Node("rock")], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file], ["rock"], apply_tagalongs=False)
 
-        result = service.search_files(
-            conn, select_tags=[tag("nonexistent")], exclude_tags=[]
-        )
+        result = service.execute_query(conn, select_strs=["nonexistent"], exclude_strs=[])
 
         assert result == []
 
@@ -32,13 +20,13 @@ class TestSearchFiles:
         file1.write_text("")
         file2.write_text("")
 
-        service.add_tags_to_files(conn, [file1], [Node("rock")], apply_tagalongs=False)
-        service.add_tags_to_files(conn, [file2], [Node("jazz")], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file1], ["rock"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file2], ["jazz"], apply_tagalongs=False)
 
-        result = service.search_files(conn, select_tags=[tag("rock")], exclude_tags=[])
+        result = service.execute_query(conn, select_strs=["rock"], exclude_strs=[])
 
         assert len(result) == 1
-        assert result[0]["path"] == str(file1.resolve())
+        assert result[0] == file1.resolve()
 
     def test_exclude_only_returns_all_except_excluded(self, conn, tmp_path):
         """Excluding without selecting should return all files except excluded."""
@@ -47,10 +35,10 @@ class TestSearchFiles:
         file1.write_text("")
         file2.write_text("")
 
-        service.add_tags_to_files(conn, [file1], [Node("rock")], apply_tagalongs=False)
-        service.add_tags_to_files(conn, [file2], [Node("jazz")], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file1], ["rock"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file2], ["jazz"], apply_tagalongs=False)
 
-        result = service.search_files(conn, select_tags=[], exclude_tags=[tag("rock")])
+        result = service.execute_query(conn, select_strs=[], exclude_strs=["rock"])
 
         assert len(result) == 1
-        assert result[0]["path"] == str(file2.resolve())
+        assert result[0] == file2.resolve()
