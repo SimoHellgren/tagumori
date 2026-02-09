@@ -7,8 +7,6 @@ import click
 from filetags import service
 from filetags.commands.context import LazyVault
 from filetags.db.init import init_db
-from filetags.models.node import Node
-
 
 @click.group(help="Database management")
 @click.pass_obj
@@ -73,15 +71,18 @@ def migrate_json(vault: LazyVault, json_vault: Path):
     with open(json_vault) as f:
         data = json.load(f)
 
-    def parse(tag: dict):
+    def to_expr(tag: dict) -> str:
         name = tag["name"]
-        children = [parse(c) for c in tag["children"]]
-        return Node(name, children)
+        children = tag.get("children", [])
+        if not children:
+            return name
+        inner = ",".join(to_expr(c) for c in children)
+        return f"{name}[{inner}]"
 
     with vault as conn:
         for entry in data["entries"]:
             path = Path(entry["name"])
-            tags = [parse(c) for c in entry["children"]]
+            tags = [to_expr(c) for c in entry["children"]]
 
             service.add_tags_to_files(conn, [path], tags, False)
 
