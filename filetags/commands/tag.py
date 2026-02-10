@@ -57,7 +57,7 @@ def edit_tag(vault: LazyVault, tag: list[str], clear_category: bool, **kwargs):
 
 @tag.command(help="Replace all instances of a tag.", name="replace")
 @click.argument("old", nargs=-1, type=click.STRING, required=True)
-@click.option("-n", "--new", type=click.STRING)
+@click.option("-n", "--new", type=click.STRING, required=True)
 @click.option(
     "--remove",
     type=click.BOOL,
