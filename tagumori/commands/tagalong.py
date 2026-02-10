@@ -3,8 +3,8 @@ from pathlib import Path
 
 import click
 
-from filetags import crud
-from filetags.commands.context import LazyVault
+from tagumori import crud
+from tagumori.commands.context import LazyVault
 
 
 @click.group(help="Tagalong management")

@@ -3,7 +3,7 @@ from sqlite3 import Connection
 
 import click
 
-from filetags.db.connect import get_vault
+from tagumori.db.connect import get_vault
 
 
 class LazyVault:

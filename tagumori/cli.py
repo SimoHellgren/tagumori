@@ -2,10 +2,10 @@ from pathlib import Path
 
 import click
 
-from filetags import service
-from filetags.commands import db, file, query, tag, tagalong
-from filetags.commands.context import LazyVault
-from filetags.utils import format_file_output
+from tagumori import service
+from tagumori.commands import db, file, query, tag, tagalong
+from tagumori.commands.context import LazyVault
+from tagumori.utils import format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
 

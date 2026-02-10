@@ -1,6 +1,6 @@
 from sqlite3 import Connection, Row
 
-from filetags.crud.base import BaseCRUD
+from tagumori.crud.base import BaseCRUD
 
 
 class QueryCRUD(BaseCRUD):

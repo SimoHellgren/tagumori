@@ -1,5 +1,5 @@
 [project]
-name = "filetags"
+name = "tagumori"
 version = "1.0.0"
 description = "Arbitrarily nestable tags for files"
 authors = [{name = "Simo Hellgrén"}]
@@ -17,7 +17,7 @@ dev = [
 ]
 
 [project.scripts]
-ftag = "filetags.cli:main"
+tagumori = "tagumori.cli:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,20 +1,20 @@
 import sqlite3
-from itertools import chain
-from functools import reduce, cache
 from collections import Counter
+from functools import cache, reduce
+from itertools import chain
 
-from filetags import crud
-from filetags.query.planner import (
+from tagumori import crud
+from tagumori.query.planner import (
+    QP_And,
+    QP_Not,
+    QP_OnlyOne,
+    QP_Or,
+    QP_Xor,
+    QueryPlan,
     Segment,
     SegmentTag,
     SegmentWildCardSingle,
     TagPath,
-    QP_And,
-    QP_Or,
-    QP_Xor,
-    QP_OnlyOne,
-    QP_Not,
-    QueryPlan,
 )
 
 flatten = chain.from_iterable

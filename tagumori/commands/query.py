@@ -4,9 +4,9 @@ from random import random
 
 import click
 
-from filetags import crud, service
-from filetags.commands.context import LazyVault
-from filetags.utils import format_file_output
+from tagumori import crud, service
+from tagumori.commands.context import LazyVault
+from tagumori.utils import format_file_output
 
 
 @click.group(help="Query management.")

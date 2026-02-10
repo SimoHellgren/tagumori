@@ -1,7 +1,7 @@
 import pytest
 from click.testing import CliRunner
 
-from filetags.cli import cli
+from tagumori.cli import cli
 
 
 @pytest.fixture

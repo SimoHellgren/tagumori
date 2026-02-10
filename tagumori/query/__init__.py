@@ -1,9 +1,9 @@
 from sqlite3 import Connection
 
-from filetags.query.ast import Expr, Transformer, validate_for_storage
-from filetags.query.executor import execute
-from filetags.query.parser import Lark_StandAlone
-from filetags.query.planner import simplify, to_query_plan
+from tagumori.query.ast import Expr, Transformer, validate_for_storage
+from tagumori.query.executor import execute
+from tagumori.query.parser import Lark_StandAlone
+from tagumori.query.planner import simplify, to_query_plan
 
 
 def _string_to_ast(string: str) -> Expr:

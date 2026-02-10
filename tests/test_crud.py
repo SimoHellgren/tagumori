@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from filetags import crud
-from filetags.crud.file import _get_inode_and_device
+from tagumori import crud
+from tagumori.crud.file import _get_inode_and_device
 
 
 class TestTagCRUD:

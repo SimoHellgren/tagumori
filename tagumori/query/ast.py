@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from filetags.query.parser import Transformer as StandaloneTransformer
+from tagumori.query.parser import Transformer as StandaloneTransformer
 
 
 @dataclass

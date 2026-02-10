@@ -3,7 +3,8 @@ from collections.abc import Generator
 
 import pytest
 
-from filetags.db.init import SCHEMA_PATH
+from tagumori.db.init import SCHEMA_PATH
+
 
 @pytest.fixture
 def conn() -> Generator[sqlite3.Connection]:
@@ -13,5 +14,3 @@ def conn() -> Generator[sqlite3.Connection]:
     conn.executescript(SCHEMA_PATH.read_text())
     yield conn
     conn.close()
-
-

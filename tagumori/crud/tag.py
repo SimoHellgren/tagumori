@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from sqlite3 import Connection, Row
 
-from filetags.crud.base import BaseCRUD, _placeholders
+from tagumori.crud.base import BaseCRUD, _placeholders
 
 
 class TagCRUD(BaseCRUD):

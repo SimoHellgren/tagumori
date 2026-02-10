@@ -1,6 +1,6 @@
 import pytest
 
-from filetags.query.ast import (
+from tagumori.query.ast import (
     And,
     Not,
     Null,
@@ -12,7 +12,7 @@ from filetags.query.ast import (
     WildcardSingle,
     Xor,
 )
-from filetags.query.planner import (
+from tagumori.query.planner import (
     QP_And,
     QP_Not,
     QP_OnlyOne,
@@ -58,9 +58,7 @@ class TestToQueryPlanNull:
 
     def test_null_with_child_propagates_is_root(self):
         # ~[a]: a must be a root
-        assert to_query_plan(Null(Tag("a"))) == TagPath(
-            [SegmentTag("a", is_root=True)]
-        )
+        assert to_query_plan(Null(Tag("a"))) == TagPath([SegmentTag("a", is_root=True)])
 
     def test_tag_with_null_child_sets_is_leaf(self):
         # a[~]: a must be a leaf
@@ -84,9 +82,7 @@ class TestToQueryPlanOperators:
 
     def test_or(self):
         result = to_query_plan(Or([Tag("a"), Tag("b")]))
-        assert result == QP_Or(
-            [TagPath([SegmentTag("a")]), TagPath([SegmentTag("b")])]
-        )
+        assert result == QP_Or([TagPath([SegmentTag("a")]), TagPath([SegmentTag("b")])])
 
     def test_xor(self):
         result = to_query_plan(Xor([Tag("a"), Tag("b")]))
