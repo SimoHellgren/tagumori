@@ -1,12 +1,11 @@
 [project]
-name = "filetags"
-version = "0.6.3"
+name = "tagumori"
+version = "1.0.0"
 description = "Arbitrarily nestable tags for files"
 authors = [{name = "Simo Hellgrén"}]
 requires-python = ">=3.11,<3.14"
 dependencies = [
     "click>=8.1.7",
-    "lark>=1.1.9",
 ]
 
 [project.optional-dependencies]
@@ -14,10 +13,11 @@ dev = [
     "pytest>=8.2.2",
     "coverage>=7.5.3",
     "mypy>=1.10.0",
+    "lark>=1.1.9",
 ]
 
 [project.scripts]
-ftag = "filetags.cli:main"
+tagumori = "tagumori.cli:main"
 
 [build-system]
 requires = ["hatchling"]

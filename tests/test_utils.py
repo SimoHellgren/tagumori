@@ -1,4 +1,4 @@
-from filetags.utils import compile_pattern
+from tagumori.utils import compile_pattern
 
 
 def test_compile_pattern_basic():

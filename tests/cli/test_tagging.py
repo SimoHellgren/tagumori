@@ -1,4 +1,4 @@
-from filetags.cli import cli
+from tagumori.cli import cli
 
 
 class TestVaultRequired:

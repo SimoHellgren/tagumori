@@ -1,17 +1,17 @@
 from dataclasses import dataclass
 
-from filetags.query.ast import (
-    Expr,
-    Tag,
+from tagumori.query.ast import (
     And,
-    Or,
-    Xor,
-    OnlyOne,
+    Expr,
     Not,
     Null,
-    WildcardSingle,
-    WildcardPath,
+    OnlyOne,
+    Or,
+    Tag,
     WildcardBounded,
+    WildcardPath,
+    WildcardSingle,
+    Xor,
 )
 
 

@@ -4,9 +4,10 @@ from pathlib import Path
 
 import click
 
-from filetags import service
-from filetags.commands.context import LazyVault
-from filetags.db.init import init_db
+from tagumori import service
+from tagumori.commands.context import LazyVault
+from tagumori.db.init import init_db
+
 
 @click.group(help="Database management")
 @click.pass_obj
@@ -66,7 +67,7 @@ def backup(vault: LazyVault, dest: Path, directory: Path):
 def migrate_json(vault: LazyVault, json_vault: Path):
     import json
 
-    from filetags import crud
+    from tagumori import crud
 
     with open(json_vault) as f:
         data = json.load(f)
@@ -125,7 +126,7 @@ def migrate(vault: LazyVault):
     """Simply reapplies schema.sql - assumes idempotent query.
     Will reassess if needed.
     """
-    from filetags.db.init import SCHEMA_PATH
+    from tagumori.db.init import SCHEMA_PATH
 
     with vault as conn:
         conn.executescript(SCHEMA_PATH.read_text())

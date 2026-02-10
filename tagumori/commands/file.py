@@ -4,8 +4,8 @@ from typing import Sequence
 
 import click
 
-from filetags import crud, service
-from filetags.commands.context import LazyVault
+from tagumori import crud, service
+from tagumori.commands.context import LazyVault
 
 
 class FileStatus(Enum):

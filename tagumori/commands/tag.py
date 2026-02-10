@@ -2,9 +2,9 @@ from typing import Optional
 
 import click
 
-from filetags import crud
-from filetags.commands.context import LazyVault
-from filetags.utils import compile_pattern
+from tagumori import crud
+from tagumori.commands.context import LazyVault
+from tagumori.utils import compile_pattern
 
 
 @click.group(help="Tag management")

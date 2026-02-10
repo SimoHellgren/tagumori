@@ -1,4 +1,4 @@
-from filetags.cli import cli
+from tagumori.cli import cli
 
 
 class TestFileAdd:
@@ -237,7 +237,15 @@ class TestFileInfo:
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "info", "--inode", str(inode), str(tagged_file)],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "info",
+                "--inode",
+                str(inode),
+                str(tagged_file),
+            ],
         )
 
         assert result.exit_code != 0
@@ -295,7 +303,15 @@ class TestFileEdit:
         # Refresh both
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "edit", str(file1), str(file2), "--refresh"],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "edit",
+                str(file1),
+                str(file2),
+                "--refresh",
+            ],
         )
         assert result.exit_code == 0
 
@@ -312,7 +328,15 @@ class TestFileEdit:
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "edit", str(tagged_file), "--path", str(new_file)],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "edit",
+                str(tagged_file),
+                "--path",
+                str(new_file),
+            ],
         )
         assert result.exit_code == 0
 
@@ -346,7 +370,15 @@ class TestFileEdit:
         # Relocate searching from tmp_path
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "edit", str(tagged_file), "--relocate", str(tmp_path)],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "edit",
+                str(tagged_file),
+                "--relocate",
+                str(tmp_path),
+            ],
         )
         assert result.exit_code == 0
 
@@ -373,13 +405,24 @@ class TestFileEdit:
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "edit", str(tagged_file), "--refresh", "--path", str(new_file)],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "edit",
+                str(tagged_file),
+                "--refresh",
+                "--path",
+                str(new_file),
+            ],
         )
 
         assert result.exit_code != 0
         assert "Can only provide one of" in result.output
 
-    def test_edit_path_with_multiple_files_fails(self, runner, vault, sample_files, tmp_path):
+    def test_edit_path_with_multiple_files_fails(
+        self, runner, vault, sample_files, tmp_path
+    ):
         """Cannot use --path with multiple files."""
         file1, file2 = sample_files
         runner.invoke(
@@ -391,7 +434,16 @@ class TestFileEdit:
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "edit", str(file1), str(file2), "--path", str(new_file)],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "edit",
+                str(file1),
+                str(file2),
+                "--path",
+                str(new_file),
+            ],
         )
 
         assert result.exit_code != 0
@@ -429,7 +481,9 @@ class TestFileCheck:
         assert "MISMATCH" in result.output
         assert str(tagged_file) in result.output
 
-    def test_check_fix_does_not_fix_mismatch(self, runner, vault, tagged_file, tmp_path):
+    def test_check_fix_does_not_fix_mismatch(
+        self, runner, vault, tagged_file, tmp_path
+    ):
         """--fix should NOT auto-fix mismatches (user must decide)."""
         backup = tmp_path / "backup.txt"
         tagged_file.rename(backup)
@@ -494,7 +548,8 @@ class TestFileMv:
         dst = tmp_path / "moved.txt"
 
         result = runner.invoke(
-            cli, ["--vault", str(vault), "file", "mv", str(tagged_file), "--to", str(dst)]
+            cli,
+            ["--vault", str(vault), "file", "mv", str(tagged_file), "--to", str(dst)],
         )
 
         assert result.exit_code == 0
@@ -518,7 +573,16 @@ class TestFileMv:
         subdir.mkdir()
 
         result = runner.invoke(
-            cli, ["--vault", str(vault), "file", "mv", str(tagged_file), "--to", str(subdir)]
+            cli,
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "mv",
+                str(tagged_file),
+                "--to",
+                str(subdir),
+            ],
         )
 
         assert result.exit_code == 0
@@ -527,19 +591,32 @@ class TestFileMv:
         assert expected_dst.exists()
         assert not tagged_file.exists()
 
-    def test_mv_multiple_files_to_directory(self, runner, vault, sample_files, tmp_path):
+    def test_mv_multiple_files_to_directory(
+        self, runner, vault, sample_files, tmp_path
+    ):
         """Move multiple files to a directory."""
         file1, file2 = sample_files
 
         # Add files to vault
-        runner.invoke(cli, ["--vault", str(vault), "file", "add", str(file1), str(file2)])
+        runner.invoke(
+            cli, ["--vault", str(vault), "file", "add", str(file1), str(file2)]
+        )
 
         subdir = tmp_path / "subdir"
         subdir.mkdir()
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "mv", str(file1), str(file2), "--to", str(subdir)],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "mv",
+                str(file1),
+                str(file2),
+                "--to",
+                str(subdir),
+            ],
         )
 
         assert result.exit_code == 0
@@ -548,17 +625,30 @@ class TestFileMv:
         assert not file1.exists()
         assert not file2.exists()
 
-    def test_mv_multiple_files_to_non_directory_fails(self, runner, vault, sample_files, tmp_path):
+    def test_mv_multiple_files_to_non_directory_fails(
+        self, runner, vault, sample_files, tmp_path
+    ):
         """Cannot move multiple files to a non-directory destination."""
         file1, file2 = sample_files
 
-        runner.invoke(cli, ["--vault", str(vault), "file", "add", str(file1), str(file2)])
+        runner.invoke(
+            cli, ["--vault", str(vault), "file", "add", str(file1), str(file2)]
+        )
 
         dst = tmp_path / "single_file.txt"
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "mv", str(file1), str(file2), "--to", str(dst)],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "mv",
+                str(file1),
+                str(file2),
+                "--to",
+                str(dst),
+            ],
         )
 
         assert result.exit_code != 0
@@ -569,7 +659,8 @@ class TestFileMv:
         dst = tmp_path / "moved.txt"
 
         result = runner.invoke(
-            cli, ["--vault", str(vault), "file", "mv", str(sample_file), "--to", str(dst)]
+            cli,
+            ["--vault", str(vault), "file", "mv", str(sample_file), "--to", str(dst)],
         )
 
         assert result.exit_code != 0
@@ -595,7 +686,9 @@ class TestFileMv:
         assert result.exit_code != 0
         assert "--to" in result.output
 
-    def test_mv_overwrite_prompts_confirmation(self, runner, vault, tagged_file, tmp_path):
+    def test_mv_overwrite_prompts_confirmation(
+        self, runner, vault, tagged_file, tmp_path
+    ):
         """Moving to existing file prompts for confirmation."""
         existing = tmp_path / "existing.txt"
         existing.write_text("original content")
@@ -603,7 +696,15 @@ class TestFileMv:
         # Answer "no" to confirmation
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "mv", str(tagged_file), "--to", str(existing)],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "mv",
+                str(tagged_file),
+                "--to",
+                str(existing),
+            ],
             input="n\n",
         )
 
@@ -620,7 +721,15 @@ class TestFileMv:
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "mv", str(tagged_file), "--to", str(existing)],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "mv",
+                str(tagged_file),
+                "--to",
+                str(existing),
+            ],
             input="y\n",
         )
 
@@ -635,7 +744,16 @@ class TestFileMv:
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "mv", str(tagged_file), "--to", str(existing), "--force"],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "mv",
+                str(tagged_file),
+                "--to",
+                str(existing),
+                "--force",
+            ],
         )
 
         assert result.exit_code == 0
@@ -649,7 +767,16 @@ class TestFileMv:
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "file", "mv", str(tagged_file), "--to", str(existing), "-f"],
+            [
+                "--vault",
+                str(vault),
+                "file",
+                "mv",
+                str(tagged_file),
+                "--to",
+                str(existing),
+                "-f",
+            ],
         )
 
         assert result.exit_code == 0

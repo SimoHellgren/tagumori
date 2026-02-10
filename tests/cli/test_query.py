@@ -1,4 +1,4 @@
-from filetags.cli import cli
+from tagumori.cli import cli
 
 
 class TestSave:
@@ -28,7 +28,16 @@ class TestSave:
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "query", "save", "my-query", "-s", "jazz", "--force"],
+            [
+                "--vault",
+                str(vault),
+                "query",
+                "save",
+                "my-query",
+                "-s",
+                "jazz",
+                "--force",
+            ],
         )
 
         assert result.exit_code == 0
@@ -37,11 +46,17 @@ class TestSave:
         result = runner.invoke(
             cli,
             [
-                "--vault", str(vault),
-                "query", "save", "complex-query",
-                "-s", "rock",
-                "-e", "jazz",
-                "-p", r"\.mp3$",
+                "--vault",
+                str(vault),
+                "query",
+                "save",
+                "complex-query",
+                "-s",
+                "rock",
+                "-e",
+                "jazz",
+                "-p",
+                r"\.mp3$",
                 "-i",
                 "-v",
             ],
@@ -69,7 +84,17 @@ class TestLs:
     def test_ls_long_shows_parameters(self, runner, vault):
         runner.invoke(
             cli,
-            ["--vault", str(vault), "query", "save", "my-query", "-s", "rock", "-e", "jazz"],
+            [
+                "--vault",
+                str(vault),
+                "query",
+                "save",
+                "my-query",
+                "-s",
+                "rock",
+                "-e",
+                "jazz",
+            ],
         )
 
         result = runner.invoke(cli, ["--vault", str(vault), "query", "ls", "-l"])
@@ -100,9 +125,7 @@ class TestRun:
             cli, ["--vault", str(vault), "query", "save", "jazz-files", "-s", "jazz"]
         )
 
-        result = runner.invoke(
-            cli, ["--vault", str(vault), "query", "run", "rock.*"]
-        )
+        result = runner.invoke(cli, ["--vault", str(vault), "query", "run", "rock.*"])
 
         assert result.exit_code == 0
         assert "[rock-files]" in result.output
@@ -118,7 +141,15 @@ class TestRun:
 
         result = runner.invoke(
             cli,
-            ["--vault", str(vault), "query", "run", "rock-files", "--write", str(output_dir)],
+            [
+                "--vault",
+                str(vault),
+                "query",
+                "run",
+                "rock-files",
+                "--write",
+                str(output_dir),
+            ],
         )
 
         assert result.exit_code == 0

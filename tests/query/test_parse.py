@@ -1,7 +1,7 @@
 import pytest
 
-from filetags.query import _string_to_ast, parse_for_storage
-from filetags.query.ast import (
+from tagumori.query import _string_to_ast, parse_for_storage
+from tagumori.query.ast import (
     And,
     Not,
     Null,
@@ -73,9 +73,7 @@ class TestParseOperators:
         assert _string_to_ast("xor(a,b)") == OnlyOne([Tag("a"), Tag("b")])
 
     def test_only_one_three_args(self):
-        assert _string_to_ast("xor(a,b,c)") == OnlyOne(
-            [Tag("a"), Tag("b"), Tag("c")]
-        )
+        assert _string_to_ast("xor(a,b,c)") == OnlyOne([Tag("a"), Tag("b"), Tag("c")])
 
 
 class TestParsePrecedence:

@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from filetags import crud
-from filetags.query import search
-from filetags.query.executor import execute, find_all
-from filetags.query.planner import (
+from tagumori import crud
+from tagumori.query import search
+from tagumori.query.executor import execute, find_all
+from tagumori.query.planner import (
     QP_And,
     QP_Not,
     QP_OnlyOne,

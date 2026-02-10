@@ -18,7 +18,7 @@ string --> parser --> parse tree --> AST --> query plan --> SQL results
 When `grammar.lark` changes, regenerate `parser.py`:
 
 ```
-python -m lark.tools.standalone filetags/query/grammar.lark > filetags/query/parser.py
+python -m lark.tools.standalone tagumori/query/grammar.lark > tagumori/query/parser.py
 ```
 
 ## Query syntax
@@ -39,3 +39,5 @@ python -m lark.tools.standalone filetags/query/grammar.lark > filetags/query/par
 | `(E)` | Grouping |
 
 Operator precedence (highest first): `!`, `,`, `|`, `^`.
+
+For distribution laws, negation semantics, wildcard identities, and simplification rules, see [algebra.md](algebra.md).

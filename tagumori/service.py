@@ -2,10 +2,10 @@ from collections import defaultdict
 from pathlib import Path
 from sqlite3 import Connection, Row
 
-from filetags import crud
-from filetags.query import parse_for_storage, search
-from filetags.query.ast import And, Expr, Tag
-from filetags.utils import compile_pattern
+from tagumori import crud
+from tagumori.query import parse_for_storage, search
+from tagumori.query.ast import And, Expr, Tag
+from tagumori.utils import compile_pattern
 
 
 # utilities for turning the db file_tag structures to AST and paths

@@ -1,4 +1,4 @@
-from filetags import service
+from tagumori import service
 
 
 class TestSearchFiles:
@@ -9,7 +9,9 @@ class TestSearchFiles:
 
         service.add_tags_to_files(conn, [file], ["rock"], apply_tagalongs=False)
 
-        result = service.execute_query(conn, select_strs=["nonexistent"], exclude_strs=[])
+        result = service.execute_query(
+            conn, select_strs=["nonexistent"], exclude_strs=[]
+        )
 
         assert result == []
 
