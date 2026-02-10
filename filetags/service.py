@@ -174,14 +174,9 @@ def execute_query(
 
     regex = compile_pattern(pattern, ignore_case)
 
-    return [
+    return sorted(
         Path(f["path"]) for f in files if bool(regex.search(f["path"])) ^ invert_match
-    ]
-
-
-def get_all_files(conn: Connection) -> list[Row]:
-    files = crud.file.get_all(conn)
-    return sorted(files, key=lambda x: x["path"])
+    )
 
 
 def relocate_file(conn: Connection, file: Row, search_root: Path):
