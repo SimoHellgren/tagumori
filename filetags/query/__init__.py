@@ -2,13 +2,13 @@ from sqlite3 import Connection
 
 from filetags.query.ast import Expr, Transformer, validate_for_storage
 from filetags.query.executor import execute
-from filetags.query.parser import parser
+from filetags.query.parser import Lark_StandAlone
 from filetags.query.planner import simplify, to_query_plan
 
 
 def _string_to_ast(string: str) -> Expr:
-    tree = parser.parse(string)
-    ast = Transformer().transform(tree)
+    parser = Lark_StandAlone(transformer=Transformer())
+    ast = parser.parse(string)
     return ast
 
 

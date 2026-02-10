@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-import lark
+from filetags.query.parser import Transformer as StandaloneTransformer
 
 
 @dataclass
@@ -105,7 +105,7 @@ class WildcardBounded:
         return f"*{self.max_depth}*[{self.children}]"
 
 
-class Transformer(lark.Transformer):
+class Transformer(StandaloneTransformer):
     # terminals
     def NAME(self, token):
         return str(token)
