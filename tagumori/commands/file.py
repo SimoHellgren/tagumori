@@ -122,7 +122,8 @@ def drop(vault: LazyVault, files: Sequence[Path]):
     with vault as conn:
         records = crud.file.get_many_by_path(conn, files)
         click.confirm(
-            f"Going do delete {len(records)} file(s). You sure about this", abort=True
+            f"Going do drop {len(records)} file(s) from database (file itself will remain on disk). You sure about this?",
+            abort=True,
         )
         for file in records:
             crud.file.delete(conn, file["id"])
@@ -136,7 +137,6 @@ def drop(vault: LazyVault, files: Sequence[Path]):
     type=click.Path(path_type=Path),
     is_flag=False,
     flag_value=Path("."),
-    default=None,
     help="Searches for file by inode/device (default: current dir)",
 )
 @click.option("--path", type=click.Path(path_type=Path, dir_okay=False, exists=True))

@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import groupby
 from pathlib import Path
 from sqlite3 import Connection, Row
 
@@ -112,10 +113,12 @@ def set_tags_on_files(
 
     file_ids = [x["id"] for x in crud.file.get_or_create_many(conn, files)]
 
-    for file_id in file_ids:
-        db_tags = crud.file_tag.get_by_file_id(conn, file_id)
+    db_tags = crud.file_tag.get_by_file_ids(conn, file_ids)
 
-        existing_paths = _db_tags_to_paths(db_tags)
+    lookup = {k: list(v) for k, v in groupby(db_tags, key=lambda x: x["file_id"])}
+
+    for file_id in file_ids:
+        existing_paths = _db_tags_to_paths(lookup.get(file_id, []))
 
         paths_to_delete = existing_paths - desired_paths
         for path in paths_to_delete:
@@ -137,13 +140,16 @@ def drop_file_tags(conn: Connection, files: list[Path], retain_file: bool = Fals
 
 
 def get_files_with_tags(conn: Connection, files: list[Path]) -> dict[Path, Expr]:
-    # TODO: turn into a proper batch get
     file_records = crud.file.get_many_by_path(conn, files)
-    tags = [crud.file_tag.get_by_file_id(conn, file["id"]) for file in file_records]
-    asts = [_db_to_ast(tag) if tag else None for tag in tags]
+    ids = [file["id"] for file in file_records]
+    tags = crud.file_tag.get_by_file_ids(conn, ids)
+
+    # tags are ordered by file id so we can groupby safely
+    lookup = {k: list(v) for k, v in groupby(tags, key=lambda x: x["file_id"])}
 
     return {
-        Path(f["path"]): {"file": f, "ast": ast} for f, ast in zip(file_records, asts)
+        Path(f["path"]): {"file": f, "ast": _db_to_ast(lookup.get(f["id"], []))}
+        for f in file_records
     }
 
 

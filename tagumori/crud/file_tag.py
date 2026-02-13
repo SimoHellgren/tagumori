@@ -31,20 +31,24 @@ def resolve_path(conn: Connection, file_id: int, path: tuple[str, ...]) -> int:
     return parent_id
 
 
+def get_by_file_ids(conn: Connection, file_ids: list[int]) -> list[Row]:
+    if not file_ids:
+        return []
 
-def get_by_file_id(conn: Connection, file_id: int) -> list[Row]:
-    q = """
+    placeholders = ",".join("?" for _ in file_ids)
+    q = f"""
         SELECT
+            file_tag.file_id,
             file_tag.id,
             tag.name,
             file_tag.parent_id
         FROM file_tag
         JOIN tag
             on tag.id = file_tag.tag_id
-        WHERE file_tag.file_id = ?
-        ORDER BY parent_id, name
+        WHERE file_tag.file_id IN ({placeholders})
+        ORDER BY file_id, parent_id, name
     """
-    return conn.execute(q, (file_id,)).fetchall()
+    return conn.execute(q, file_ids).fetchall()
 
 
 def replace(conn: Connection, old_id: int, new_id: int) -> None:
