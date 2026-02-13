@@ -32,6 +32,9 @@ def resolve_path(conn: Connection, file_id: int, path: tuple[str, ...]) -> int:
 
 
 def get_by_file_ids(conn: Connection, file_ids: list[int]) -> list[Row]:
+    if not file_ids:
+        return []
+
     placeholders = ",".join("?" for _ in file_ids)
     q = f"""
         SELECT
