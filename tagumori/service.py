@@ -113,14 +113,12 @@ def set_tags_on_files(
 
     file_ids = [x["id"] for x in crud.file.get_or_create_many(conn, files)]
 
-    tags_lookup = dict(
-        groupby(
-            crud.file_tag.get_by_file_ids(conn, file_ids), key=lambda x: x["file_id"]
-        )
-    )
+    db_tags = crud.file_tag.get_by_file_ids(conn, file_ids)
+
+    lookup = {k: list(v) for k, v in groupby(db_tags, key=lambda x: x["file_id"])}
 
     for file_id in file_ids:
-        existing_paths = _db_tags_to_paths(tags_lookup.get(file_id, []))
+        existing_paths = _db_tags_to_paths(lookup.get(file_id, []))
 
         paths_to_delete = existing_paths - desired_paths
         for path in paths_to_delete:
