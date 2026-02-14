@@ -157,6 +157,7 @@ def execute_query(
     conn: Connection,
     select_strs: list[str],
     exclude_strs: list[str],
+    ignore_tag_case: bool = False,
     pattern: str = ".*",
     ignore_case: bool = False,
     invert_match: bool = False,
@@ -173,7 +174,7 @@ def execute_query(
     query_str = ",".join(query_parts)
 
     if query_str:
-        ids = search(conn, query_str, True)
+        ids = search(conn, query_str, not ignore_tag_case)
         files = crud.file.get_many(conn, list(ids))
     else:
         files = crud.file.get_all(conn)

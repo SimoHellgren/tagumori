@@ -115,6 +115,7 @@ def drop(vault: LazyVault, files: tuple[int, ...], retain_file: bool):
 )
 @click.option("-s", "--select", multiple=True)
 @click.option("-e", "--exclude", multiple=True)
+@click.option("-I", "--ignore-tag-case", is_flag=True, help="Ignore tag case.")
 @click.option("-p", "--pattern", help="Filter output by regex pattern.", default=r".*")
 @click.option("-i", "--ignore-case", is_flag=True, help="Ignore regex case.")
 @click.option(
@@ -136,6 +137,7 @@ def ls(
     long: bool,
     select: tuple[str, ...],
     exclude: tuple[str, ...],
+    ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,
     invert_match: bool,
@@ -145,7 +147,7 @@ def ls(
     # TODO: could potentially fetch tags already in service
     with vault as conn:
         paths = service.execute_query(
-            conn, select, exclude, pattern, ignore_case, invert_match
+            conn, select, exclude, ignore_tag_case, pattern, ignore_case, invert_match
         )
 
         if long:

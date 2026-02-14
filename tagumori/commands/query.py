@@ -19,6 +19,7 @@ def query(vault: LazyVault):
 @click.argument("name", type=str)
 @click.option("-s", "--select", multiple=True)
 @click.option("-e", "--exclude", multiple=True)
+@click.option("-I", "--ignore-tag-case", is_flag=True, help="Ignore tag case.")
 @click.option("-p", "--pattern", help="Filter output by regex pattern.", default=r".*")
 @click.option("-i", "--ignore-case", is_flag=True, help="Ignore regex case.")
 @click.option(
@@ -39,6 +40,7 @@ def save(
     name: str,
     select: tuple[str, ...],
     exclude: tuple[str, ...],
+    ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,
     invert_match: bool,
@@ -50,6 +52,7 @@ def save(
         "name": name,
         "select_tags": json.dumps(list(select)),
         "exclude_tags": json.dumps(list(exclude)),
+        "ignore_tag_case": ignore_tag_case,
         "pattern": pattern,
         "ignore_case": ignore_case,
         "invert_match": invert_match,
@@ -115,6 +118,7 @@ def run(
                 conn,
                 select_strs,
                 exclude_strs,
+                bool(query["ignore_tag_case"]),
                 query["pattern"],
                 bool(query["ignore_case"]),
                 bool(query["invert_match"]),
@@ -154,9 +158,13 @@ def ls_long_format(data: dict):
 
     selects = " ".join(f"-s {x}" for x in json.loads(data["select_tags"]))
     excludes = " ".join(f"-e {x}" for x in json.loads(data["exclude_tags"]))
-    flags = (
-        f"{'-i ' if data['ignore_case'] else ''}{'-v ' if data['invert_match'] else ''}"
-    )
+
+    flag_map = [
+        ("-I", data["ignore_tag_case"]),
+        ("-i", data["ignore_case"]),
+        ("-v", data["invert_match"]),
+    ]
+    flags = " ".join(f for f, v in flag_map if v)
 
     return f"{selects} {excludes} -p {data['pattern']} {flags}".strip()
 
