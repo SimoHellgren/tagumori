@@ -44,3 +44,28 @@ class TestSearchFiles:
 
         assert len(result) == 1
         assert result[0] == file2.resolve()
+
+    def test_select_case_sensitive_by_default(self, conn, tmp_path):
+        """Tag search is case-sensitive by default."""
+        file = tmp_path / "file.txt"
+        file.write_text("")
+
+        service.add_tags_to_files(conn, [file], ["Rock"], apply_tagalongs=False)
+
+        result = service.execute_query(conn, select_strs=["rock"], exclude_strs=[])
+
+        assert result == []
+
+    def test_select_ignore_tag_case(self, conn, tmp_path):
+        """With ignore_tag_case, tag search should be case-insensitive."""
+        file = tmp_path / "file.txt"
+        file.write_text("")
+
+        service.add_tags_to_files(conn, [file], ["Rock"], apply_tagalongs=False)
+
+        result = service.execute_query(
+            conn, select_strs=["rock"], exclude_strs=[], ignore_tag_case=True
+        )
+
+        assert len(result) == 1
+        assert result[0] == file.resolve()
