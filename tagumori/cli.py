@@ -5,7 +5,7 @@ import click
 from tagumori import service
 from tagumori.commands import db, file, query, tag, tagalong
 from tagumori.commands.context import LazyVault
-from tagumori.utils import format_file_output
+from tagumori.render import format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
 

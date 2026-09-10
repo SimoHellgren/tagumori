@@ -1,11 +1,12 @@
+from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
-from typing import Sequence
 
 import click
 
 from tagumori import crud, service
 from tagumori.commands.context import LazyVault
+from tagumori.render import print_box
 
 
 class FileStatus(Enum):
@@ -34,18 +35,6 @@ def get_file_status(path: Path, record: dict):
 @click.pass_obj
 def file(vault: LazyVault):
     pass
-
-
-def print_box(title: str, lines: list[str]):
-    width = max(len(click.unstyle(line)) for line in [title, *lines]) + 2
-
-    click.echo(f"┌{'─' * width}┐")
-    click.echo(f"│ {title.ljust(width - 1)}│")
-    click.echo(f"├{'─' * width}┤")
-    for line in lines:
-        padding = width - 1 - len(click.unstyle(line))
-        click.echo(f"│ {line}{' ' * padding}│")
-    click.echo(f"└{'─' * width}┘")
 
 
 def check_path(p: Path) -> dict:
