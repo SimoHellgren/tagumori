@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 import click
@@ -48,8 +49,8 @@ cli.add_command(review.review)
 @click.pass_obj
 def add(
     vault: LazyVault,
-    files: tuple[Path, ...],
-    tags: tuple[str, ...],
+    files: Sequence[Path],
+    tags: Sequence[str],
     tagalongs: bool,
 ):
     with vault as conn:
@@ -66,7 +67,7 @@ def add(
 )
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
 @click.pass_obj
-def remove(vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...]):
+def remove(vault: LazyVault, files: Sequence[Path], tags: Sequence[str]):
     with vault as conn:
         service.remove_tags_from_files(conn, files, tags)
 
@@ -87,9 +88,7 @@ def remove(vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...]):
     help="Apply / don't apply tagalongs.",
 )
 @click.pass_obj
-def set_(
-    vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...], tagalongs: bool
-):
+def set_(vault: LazyVault, files: Sequence[Path], tags: Sequence[str], tagalongs: bool):
 
     with vault as conn:
         service.set_tags_on_files(conn, files, tags, tagalongs)
@@ -105,7 +104,7 @@ def set_(
 )
 @click.option("--retain-file", type=click.BOOL, is_flag=True)
 @click.pass_obj
-def drop(vault: LazyVault, files: tuple[int, ...], retain_file: bool):
+def drop(vault: LazyVault, files: Sequence[int], retain_file: bool):
     with vault as conn:
         service.drop_file_tags(conn, files, retain_file)
 
@@ -136,8 +135,8 @@ def drop(vault: LazyVault, files: tuple[int, ...], retain_file: bool):
 def ls(
     vault: LazyVault,
     long: bool,
-    select: tuple[str, ...],
-    exclude: tuple[str, ...],
+    select: Sequence[str],
+    exclude: Sequence[str],
     ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,

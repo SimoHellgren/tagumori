@@ -161,8 +161,8 @@ def lookup_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
 
 def list_files(
     conn: Connection,
-    select: tuple[str, ...],
-    exclude: tuple[str, ...],
+    select: Sequence[str],
+    exclude: Sequence[str],
     ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,
