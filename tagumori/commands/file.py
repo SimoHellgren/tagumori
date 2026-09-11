@@ -6,6 +6,7 @@ import click
 
 from tagumori import crud, service
 from tagumori.commands.context import LazyVault
+from tagumori.models import File
 from tagumori.render import print_box
 
 
@@ -16,16 +17,16 @@ class FileStatus(Enum):
     INODE_MISSING = "inode_missing"
 
 
-def get_file_status(path: Path, record: dict):
+def get_file_status(path: Path, record: File) -> FileStatus:
     if not path.exists():
         return FileStatus.NOT_FOUND
 
-    if not record["inode"]:
+    if not record.inode:
         return FileStatus.INODE_MISSING
 
     stat = path.stat()
 
-    if not (record["inode"] == stat.st_ino and record["device"] == stat.st_dev):
+    if not (record.inode == stat.st_ino and record.device == stat.st_dev):
         return FileStatus.INODE_MISMATCH
 
     return FileStatus.OK
@@ -44,7 +45,7 @@ def check_path(p: Path) -> dict:
     return {"text": "Not found", "fg": "red"}
 
 
-def check_inode(p: Path, record: dict) -> dict:
+def check_inode(p: Path, record: File) -> dict:
     status = get_file_status(p, record)
     return {
         FileStatus.OK: {"text": "OK", "fg": "green"},
@@ -72,7 +73,7 @@ def info(vault: LazyVault, files: Sequence[Path], inode: int):
             if not records:
                 return
 
-            lookup_paths = [Path(r["path"]) for r in records]
+            lookup_paths = [r.path for r in records]
 
         else:
             lookup_paths = files
@@ -115,7 +116,7 @@ def drop(vault: LazyVault, files: Sequence[Path]):
             abort=True,
         )
         for file in records:
-            crud.file.delete(conn, file["id"])
+            crud.file.delete(conn, file.id)
 
 
 @file.command(help="Edit file record.")
@@ -152,13 +153,13 @@ def edit(
         records = crud.file.get_many_by_path(conn, files)
         if path:
             stat = path.stat()  # stat the new file
-            crud.file.update(conn, records[0]["id"], path, stat.st_ino, stat.st_dev)
+            crud.file.update(conn, records[0].id, path, stat.st_ino, stat.st_dev)
 
         elif refresh:
             for record in records:
-                p = Path(record["path"])
+                p = Path(record.path)
                 stat = p.stat()
-                crud.file.update(conn, record["id"], p, stat.st_ino, stat.st_dev)
+                crud.file.update(conn, record.id, p, stat.st_ino, stat.st_dev)
 
         elif relocate:
             for record in records:
@@ -175,7 +176,7 @@ def check(vault: LazyVault, fix: bool):
         all_files = crud.file.get_all(conn)
 
         for record in all_files:
-            p = Path(record["path"])
+            p = Path(record.path)
             status = get_file_status(p, record)
 
             if status == FileStatus.OK:
@@ -184,7 +185,7 @@ def check(vault: LazyVault, fix: bool):
             # Auto-fix missing inodes (file exists, just needs stat)
             if status == FileStatus.INODE_MISSING and fix:
                 stat = p.stat()
-                crud.file.update(conn, record["id"], p, stat.st_ino, stat.st_dev)
+                crud.file.update(conn, record.id, p, stat.st_ino, stat.st_dev)
                 issues.append((p, status, True))
             else:
                 issues.append((p, status, False))
@@ -239,6 +240,6 @@ def mv(vault: LazyVault, sources: Sequence[Path], dst: Path, force: bool):
 
             shutil.move(src, actual_dst)
             stat = actual_dst.stat()
-            crud.file.update(conn, record["id"], actual_dst, stat.st_ino, stat.st_dev)
+            crud.file.update(conn, record.id, actual_dst, stat.st_ino, stat.st_dev)
 
             click.echo(f"Moved {src} -> {actual_dst}")

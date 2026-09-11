@@ -6,6 +6,7 @@ import click
 
 from tagumori import crud, service
 from tagumori.commands.context import LazyVault
+from tagumori.models import Query
 from tagumori.render import format_file_output
 
 
@@ -102,26 +103,22 @@ def run(
     write: Path | None,
     shuffle: bool,
 ):
-    import json
 
     with vault as conn:
         queries = crud.query.get_all(conn)
 
         for query in queries:
-            if not re.match(pattern, query["name"]):
+            if not re.match(pattern, query.name):
                 continue
-
-            select_strs = json.loads(query["select_tags"])
-            exclude_strs = json.loads(query["exclude_tags"])
 
             paths = service.execute_query(
                 conn,
-                select_strs,
-                exclude_strs,
-                bool(query["ignore_tag_case"]),
-                query["pattern"],
-                bool(query["ignore_case"]),
-                bool(query["invert_match"]),
+                query.select_tags,
+                query.exclude_tags,
+                bool(query.ignore_tag_case),
+                query.pattern,
+                bool(query.ignore_case),
+                bool(query.invert_match),
             )
 
             if long:
@@ -139,7 +136,7 @@ def run(
                 output_lines = sorted(output_lines, key=lambda x: random())
 
             if write:
-                path = write / query["name"]
+                path = write / query.name
 
                 click.echo(f"Writing {path}")
                 with open(path, "w") as f:
@@ -147,26 +144,25 @@ def run(
                         click.echo(msg, f)
 
             else:
-                click.echo(f"[{query['name']}]")
+                click.echo(f"[{query.name}]")
                 for msg in output_lines:
                     click.echo(msg)
                 click.echo()
 
 
-def ls_long_format(data: dict):
-    import json
+def ls_long_format(data: Query):
 
-    selects = " ".join(f"-s {x}" for x in json.loads(data["select_tags"]))
-    excludes = " ".join(f"-e {x}" for x in json.loads(data["exclude_tags"]))
+    selects = " ".join(f"-s {x}" for x in data.select_tags)
+    excludes = " ".join(f"-e {x}" for x in data.exclude_tags)
 
     flag_map = [
-        ("-I", data["ignore_tag_case"]),
-        ("-i", data["ignore_case"]),
-        ("-v", data["invert_match"]),
+        ("-I", data.ignore_tag_case),
+        ("-i", data.ignore_case),
+        ("-v", data.invert_match),
     ]
     flags = " ".join(f for f, v in flag_map if v)
 
-    return f"{selects} {excludes} -p {data['pattern']} {flags}".strip()
+    return f"{selects} {excludes} -p {data.pattern} {flags}".strip()
 
 
 @query.command(help="List all saved queries.")
@@ -174,10 +170,10 @@ def ls_long_format(data: dict):
 @click.pass_obj
 def ls(vault: LazyVault, long: bool):
     with vault as conn:
-        records = sorted(crud.query.get_all(conn), key=lambda x: x["name"])
+        records = sorted(crud.query.get_all(conn), key=lambda x: x.name)
 
     for record in records:
-        msg = click.style(record["name"], fg="yellow")
+        msg = click.style(record.name, fg="yellow")
 
         if long:
             msg += click.style(f" {ls_long_format(record)}", fg="blue")
@@ -194,4 +190,4 @@ def drop(vault: LazyVault, name: tuple[str, ...]):
             record = crud.query.get_by_name(conn, name_)
             if not record:
                 raise click.ClickException(f"Query {name_} not found.")
-            crud.query.delete(conn, record["id"])
+            crud.query.delete(conn, record.id)

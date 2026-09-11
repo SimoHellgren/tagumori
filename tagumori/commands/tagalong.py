@@ -23,7 +23,7 @@ def add(vault: LazyVault, tag: tuple[str, ...], tagalong: tuple[str, ...]):
         targets = crud.tag.get_or_create_many(conn, tagalong)
 
         for source, target in product(sources, targets):
-            crud.tagalong.create(conn, source["id"], target["id"])
+            crud.tagalong.create(conn, source.id, target.id)
 
 
 @tagalong.command(help="Remove tagalongs.")
@@ -36,7 +36,7 @@ def remove(vault: LazyVault, tag: tuple[str, ...], tagalong: tuple[str, ...]):
         targets = crud.tag.get_many_by_name(conn, tagalong)
 
         for source, target in product(sources, targets):
-            crud.tagalong.delete(conn, source["id"], target["id"])
+            crud.tagalong.delete(conn, source.id, target.id)
 
 
 @tagalong.command(help="Show all tagalongs.")
@@ -59,6 +59,6 @@ def apply(vault: LazyVault, file: tuple[Path, ...]):
     # TODO: consider filtering by tag
     with vault as conn:
         files = crud.file.get_many_by_path(conn, file)
-        file_ids = [f["id"] for f in files]
+        file_ids = [f.id for f in files]
 
         crud.tagalong.apply(conn, file_ids)

@@ -4,7 +4,7 @@ from pathlib import Path
 from sqlite3 import Row
 from typing import Self
 
-from tagumori.query.ast import Expr
+# from tagumori.query.ast import Expr
 
 
 class RowModel:
@@ -23,7 +23,7 @@ class File(RowModel):
     device: int | None
 
     @classmethod
-    def from_row(cls, row):
+    def from_row(cls, row) -> "File":
         data = {
             **row,
             "path": Path(row["path"]),
@@ -32,14 +32,14 @@ class File(RowModel):
 
 
 @dataclass(frozen=True, slots=True)
-class Tag:
+class Tag(RowModel):
     id: int
     name: str
     category: str | None
 
 
 @dataclass(frozen=True, slots=True)
-class Query:
+class Query(RowModel):
     id: int
     name: str
     select_tags: tuple[str, ...]  # json in db
@@ -50,7 +50,7 @@ class Query:
     ignore_tag_case: bool
 
     @classmethod
-    def from_row(cls, row):
+    def from_row(cls, row) -> "Query":
         return cls(
             id=row["id"],
             name=row["name"],
@@ -63,7 +63,7 @@ class Query:
         )
 
 
-@dataclass
-class TaggedFile:
-    file: File
-    tags: Expr | None = None
+# @dataclass
+# class TaggedFile:
+#     file: File
+#     tags: Expr | None = None

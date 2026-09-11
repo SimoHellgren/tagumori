@@ -101,7 +101,7 @@ def execute(conn: sqlite3.Connection, qp: QueryPlan, case: bool = True):
     # cached func for use with NOT
     @cache
     def get_all_file_ids():
-        return {x["id"] for x in crud.file.get_all(conn)}
+        return {x.id for x in crud.file.get_all(conn)}
 
     def _exec(qp: QueryPlan):
         """Inner function to simplify calling and caching"""

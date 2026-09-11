@@ -34,8 +34,6 @@ class SegmentWildCardSingle:
 class SegmentWildCardPath:
     """Matches zore or more tags (**)"""
 
-    pass
-
 
 @dataclass
 class SegmentWildCardBounded:

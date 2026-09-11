@@ -1,43 +1,43 @@
 from collections.abc import Sequence
-from sqlite3 import Connection, Row
+from sqlite3 import Connection
 
 from tagumori.crud.base import BaseCRUD, _placeholders
+from tagumori.models import Tag
 
 
-class TagCRUD(BaseCRUD):
-    def __init__(self):
-        super().__init__(table="tag", unique_col="name")
-
-    def get_by_name(self, conn: Connection, name: str) -> Row:
+class TagCRUD(BaseCRUD[Tag]):
+    def get_by_name(self, conn: Connection, name: str) -> Tag | None:
         return self.get_by_unique_col(conn, name)
 
-    def get_many_by_name(self, conn: Connection, names: Sequence[str]) -> list[Row]:
+    def get_many_by_name(self, conn: Connection, names: Sequence[str]) -> list[Tag]:
         return self.get_many_by_unique_col(conn, names)
 
-    def create(self, conn: Connection, name: str, category: str | None = None) -> Row:
-        return conn.execute(
-            "INSERT INTO tag(name, category) VALUES (?, ?) RETURNING *",
-            (name, category),
-        ).fetchone()
+    def create(self, conn: Connection, name: str, category: str | None = None) -> Tag:
+        return self._one_or_raise(
+            conn.execute(
+                "INSERT INTO tag(name, category) VALUES (?, ?) RETURNING *",
+                (name, category),
+            ).fetchone()
+        )
 
-    def get_or_create(self, conn: Connection, name: str) -> Row:
+    def get_or_create(self, conn: Connection, name: str) -> Tag:
         q = """
             INSERT INTO tag(name) VALUES (?)
             ON CONFLICT (name) DO UPDATE SET name=name --no-op
             RETURNING *
         """
-        return conn.execute(q, (name,)).fetchone()
+        return self._one_or_raise(conn.execute(q, (name,)).fetchone())
 
-    def get_or_create_many(self, conn: Connection, names: list[str]) -> list[Row]:
+    def get_or_create_many(self, conn: Connection, names: list[str]) -> list[Tag]:
         vals = _placeholders(len(names), "(?)")
 
         q = f"""
             INSERT INTO tag(name) VALUES {vals}
             ON CONFLICT (name) DO UPDATE SET name=name --no-op
-            RETURNING id
+            RETURNING *
         """
 
-        return conn.execute(q, names).fetchall()
+        return self._many(conn.execute(q, names).fetchall())
 
     def update(self, conn: Connection, names: list[str], data: dict) -> None:
         ALLOWED_COLS = {"name", "category"}
@@ -53,8 +53,8 @@ class TagCRUD(BaseCRUD):
             WHERE name in ({name_phs})
         """
 
-        vals = tuple([*data.values(), *names])
+        vals = (*data.values(), *names)
         conn.execute(q, vals)
 
 
-tag = TagCRUD()
+tag = TagCRUD(table="tag", unique_col="name", model=Tag)

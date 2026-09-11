@@ -26,8 +26,8 @@ def make_file(conn, path_str, tag_paths):
         parent_id = None
         for tag_name in tag_path:
             tag = crud.tag.get_or_create(conn, tag_name)
-            parent_id = crud.file_tag.attach(conn, file_row["id"], tag["id"], parent_id)
-    return file_row["id"]
+            parent_id = crud.file_tag.attach(conn, file_row.id, tag.id, parent_id)
+    return file_row.id
 
 
 class TestFindAllSimple:
