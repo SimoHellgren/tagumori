@@ -3,7 +3,7 @@ from pathlib import Path
 import click
 
 from tagumori import service
-from tagumori.commands import db, file, query, tag, tagalong
+from tagumori.commands import db, file, query, review, tag, tagalong
 from tagumori.commands.context import LazyVault
 from tagumori.render import format_file_output
 
@@ -27,6 +27,7 @@ cli.add_command(tagalong.tagalong)
 cli.add_command(db.db)
 cli.add_command(file.file)
 cli.add_command(query.query)
+cli.add_command(review.review)
 
 
 @cli.command(help="Add tags to files")
