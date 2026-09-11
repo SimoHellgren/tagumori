@@ -6,7 +6,7 @@ import click
 
 from tagumori import crud, service
 from tagumori.commands.context import LazyVault
-from tagumori.models import Query
+from tagumori.models import Query, TaggedFile
 from tagumori.render import format_file_output
 
 
@@ -111,7 +111,7 @@ def run(
             if not re.match(pattern, query.name):
                 continue
 
-            paths = service.execute_query(
+            files = service.execute_query(
                 conn,
                 query.select_tags,
                 query.exclude_tags,
@@ -122,10 +122,10 @@ def run(
             )
 
             if long:
-                files_with_tags = service.get_files_with_tags(conn, paths)
+                files_with_tags = service.get_files_with_tags(conn, files)
 
             else:
-                files_with_tags = {f: {} for f in paths}
+                files_with_tags = [TaggedFile(file, None) for file in files]
 
             output_lines = format_file_output(
                 files_with_tags, long, relative_to, prefix

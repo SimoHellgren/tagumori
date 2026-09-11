@@ -67,3 +67,7 @@ class Query(RowModel):
 class TaggedFile:
     file: File
     tags: Expr | None = None
+
+    @property
+    def path(self) -> Path:
+        return self.file.path

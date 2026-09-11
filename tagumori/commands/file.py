@@ -17,14 +17,14 @@ class FileStatus(Enum):
     INODE_MISSING = "inode_missing"
 
 
-def get_file_status(path: Path, record: File) -> FileStatus:
-    if not path.exists():
+def get_file_status(record: File) -> FileStatus:
+    if not record.path.exists():
         return FileStatus.NOT_FOUND
 
     if not record.inode:
         return FileStatus.INODE_MISSING
 
-    stat = path.stat()
+    stat = record.path.stat()
 
     if not (record.inode == stat.st_ino and record.device == stat.st_dev):
         return FileStatus.INODE_MISMATCH
@@ -45,8 +45,8 @@ def check_path(p: Path) -> dict:
     return {"text": "Not found", "fg": "red"}
 
 
-def check_inode(p: Path, record: File) -> dict:
-    status = get_file_status(p, record)
+def check_inode(record: File) -> dict:
+    status = get_file_status(record)
     return {
         FileStatus.OK: {"text": "OK", "fg": "green"},
         FileStatus.INODE_MISMATCH: {"text": "Mismatch", "fg": "red"},
@@ -73,22 +73,18 @@ def info(vault: LazyVault, files: Sequence[Path], inode: int):
             if not records:
                 return
 
-            lookup_paths = [r.path for r in records]
-
         else:
-            lookup_paths = files
+            records = crud.file.get_many_by_path(conn, files)
 
-        files_with_tags = service.get_files_with_tags(conn, lookup_paths)
+        files_with_tags = service.get_files_with_tags(conn, records)
 
-    for path, data in files_with_tags.items():
-        record = data["file"]
-
+    for file in files_with_tags:
         print_box(
-            str(path),
+            str(file.path),
             [
-                f"Tags: {data['ast'] or ''}",
-                "Path: " + click.style(**check_path(path)),
-                "Inode/device: " + click.style(**check_inode(path, record)),
+                f"Tags: {file.tags or ''}",
+                "Path: " + click.style(**check_path(file.path)),
+                "Inode/device: " + click.style(**check_inode(file.file)),
             ],
         )
 
@@ -177,7 +173,7 @@ def check(vault: LazyVault, fix: bool):
 
         for record in all_files:
             p = Path(record.path)
-            status = get_file_status(p, record)
+            status = get_file_status(record)
 
             if status == FileStatus.OK:
                 continue

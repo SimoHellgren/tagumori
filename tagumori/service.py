@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlite3 import Connection, Row
 
 from tagumori import crud
-from tagumori.models import File
+from tagumori.models import File, TaggedFile
 from tagumori.query import parse_for_storage, search
 from tagumori.query.ast import And, Expr, Tag
 from tagumori.utils import compile_pattern
@@ -149,18 +149,14 @@ def drop_file_tags(conn: Connection, files: Sequence[Path], retain_file: bool = 
             crud.file.delete(conn, file_id)
 
 
-def get_files_with_tags(conn: Connection, files: Sequence[Path]) -> dict[Path, dict]:
-    file_records = crud.file.get_many_by_path(conn, files)
-    ids = [file.id for file in file_records]
+def get_files_with_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
+    ids = [file.id for file in files]
     tags = crud.file_tag.get_by_file_ids(conn, ids)
 
     # tags are ordered by file id so we can groupby safely
     lookup = {k: list(v) for k, v in groupby(tags, key=lambda x: x["file_id"])}
 
-    return {
-        Path(f.path): {"file": f, "ast": _db_to_ast(lookup.get(f.id, []))}
-        for f in file_records
-    }
+    return [TaggedFile(f, _db_to_ast(lookup.get(f.id, []))) for f in files]
 
 
 def execute_query(
@@ -171,7 +167,7 @@ def execute_query(
     pattern: str = ".*",
     ignore_case: bool = False,
     invert_match: bool = False,
-) -> list[Path]:
+) -> list[File]:
 
     query_parts = []
 
@@ -198,7 +194,8 @@ def execute_query(
     regex = compile_pattern(pattern, ignore_case)
 
     return sorted(
-        Path(f.path) for f in files if bool(regex.search(str(f.path))) ^ invert_match
+        (f for f in files if bool(regex.search(str(f.path))) ^ invert_match),
+        key=lambda f: f.path,
     )
 
 

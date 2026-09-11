@@ -1,28 +1,30 @@
 """Module for creating user-facing presentations"""
 
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from pathlib import Path
 
 import click
 
+from tagumori.models import TaggedFile
+
 
 def format_file_output(
-    files: dict, long: bool, relative_to: Path, prefix: str
+    files: Sequence[TaggedFile], long: bool, relative_to: Path, prefix: str
 ) -> Generator[str]:
     # TODO: the data flow / interface is a bit messy
-    for path, data in files.items():
+    for file in files:
         try:
             # relative path
-            display_path = prefix / path.relative_to(relative_to.resolve())
+            display_path = prefix / file.path.relative_to(relative_to.resolve())
 
         except ValueError:
             # default to absolute path if not relative
-            display_path = prefix / path
+            display_path = prefix / file.path
 
         msg = click.style(display_path, fg="green")
 
         # walrus protects from printin "None" when there are no tags
-        if long and (ast := data["ast"]):
+        if long and (ast := file.tags):
             msg += "\t" + click.style(ast, fg="cyan")
 
         yield msg

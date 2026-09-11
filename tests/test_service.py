@@ -28,7 +28,7 @@ class TestSearchFiles:
         result = service.execute_query(conn, select_strs=["rock"], exclude_strs=[])
 
         assert len(result) == 1
-        assert result[0] == file1.resolve()
+        assert result[0].path == file1.resolve()
 
     def test_exclude_only_returns_all_except_excluded(self, conn, tmp_path):
         """Excluding without selecting should return all files except excluded."""
@@ -43,7 +43,7 @@ class TestSearchFiles:
         result = service.execute_query(conn, select_strs=[], exclude_strs=["rock"])
 
         assert len(result) == 1
-        assert result[0] == file2.resolve()
+        assert result[0].path == file2.resolve()
 
     def test_select_case_sensitive_by_default(self, conn, tmp_path):
         """Tag search is case-sensitive by default."""
@@ -68,4 +68,4 @@ class TestSearchFiles:
         )
 
         assert len(result) == 1
-        assert result[0] == file.resolve()
+        assert result[0].path == file.resolve()
