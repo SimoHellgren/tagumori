@@ -1,7 +1,19 @@
 import json
+from dataclasses import fields
 from pathlib import Path
 
+import pytest
+
 from tagumori.models import File, Query, Tag, TaggedFile
+
+
+@pytest.mark.parametrize(
+    "model,table", [(File, "file"), (Tag, "tag"), [Query, "query"]]
+)
+def test_model_matches_schema(conn, model, table):
+    cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+
+    assert cols == {f.name for f in fields(model)}
 
 
 class TestFileFromRow:
