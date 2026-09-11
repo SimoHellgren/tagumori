@@ -24,7 +24,7 @@ def search(
     return execute(conn, query_plan, get_all_ids, case)
 
 
-def parse_for_storage(string) -> Expr:
+def parse_for_storage(string: str) -> Expr:
     ast = _string_to_ast(string)
 
     if not validate_for_storage(ast):

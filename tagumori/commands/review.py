@@ -1,96 +1,112 @@
 import cmd
-import re
-import sys
-from collections.abc import Callable, Iterable
+from itertools import chain
 from pathlib import Path
+from typing import TextIO
 
 import click
 from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.completion import Completer, Completion, WordCompleter
 from prompt_toolkit.document import Document
 
-from tagumori import crud
+from tagumori import crud, service
 from tagumori.commands.context import LazyVault
+from tagumori.query import parse_for_storage
+
+flatten = chain.from_iterable
 
 
-@click.command()
-@click.argument("file", type=click.File("r"))
-@click.pass_obj
-def review(vault: LazyVault, file):
-    lines = [Path(l.strip()) for l in file]
+class ReviewSession:
+    def __init__(self, vault: LazyVault, items: list[Path]):
+        self.vault = vault
+        self.items = items
+        self.index = 0
 
-    sys.stdin = open("/dev/tty")
+        with vault as conn:
+            self.known_tags = {t.name for t in crud.tag.get_all(conn)}
 
-    with vault as conn:
-        data = crud.tag.get_all(conn)
-        tags = {x.name for x in data}
-        print(tags)
+    @property
+    def current(self) -> Path:
+        return self.items[self.index]
 
-    completer = TagCompleter(lambda: sorted(tags))
+    def add_tags(self, expr: str) -> None:
+        # validate before hitting db
+        node = parse_for_storage(expr)
 
-    repl = REPL(lines, completer)
+        with self.vault as conn:
+            service.add_tags_to_files(conn, [self.current], [expr])
 
-    repl.cmdloop()
+        # using private method but oh well
+        new_tags = {*flatten(service._ast_to_paths(node))}
+        self.known_tags |= new_tags
 
 
-TAG_CHARS = re.compile(r"[A-Za-z0-9_-]*$")
+DELIMS = "[,"
 
 
 class TagCompleter(Completer):
+    # TODO: consider persisting to FileHistory (see prompt_toolkit docs)
+    # this should be a github issue, though
+
     """Completer for `tag[child,child[grandchild]]`-style expressions."""
 
-    def __init__(self, get_tags: Callable[[], Iterable[str]]):
-        self.get_tags = get_tags
+    def __init__(self, known_tags: set[str]):
+        self.known_tags = known_tags
 
     def get_completions(self, document: Document, complete_event):
         text = document.text_before_cursor
-        partial = TAG_CHARS.search(text).group(0)
 
-        token_start = len(text) - len(partial)
-        char_before_token = text[token_start - 1] if token_start > 0 else ""
+        cut = max(text.rfind(d) for d in DELIMS)
 
-        depth = text.count("[") - text.count("]")
-        last_char = text[-1] if text else ""
+        partial = text[cut + 1 :].lstrip()
 
-        if depth > 0 and last_char != ",":
-            yield Completion("]", start_position=0, display_meta="close group")
+        # TODO: consider case-insensitive completions
+        for tag in sorted(t for t in self.known_tags if t.startswith(partial)):
+            yield Completion(tag, start_position=-len(partial))
 
-        if char_before_token in ("[", ",", ""):
-            for tag in sorted(self.get_tags()):
-                if tag.startswith(partial):
-                    yield Completion(tag, start_position=-len(partial))
+        # TODO: completions for at least ], perhaps [
+        # char_before_token = text[token_start - 1] if token_start > 0 else ""
+        # depth = text.count("[") - text.count("]")
+        # last_char = text[-1] if text else ""
+
+        # if depth > 0 and last_char != ",":
+        #     yield Completion("]", start_position=0, display_meta="close group")
+
+        # if char_before_token in ("[", ",", ""):
+        #     for tag in sorted(self.get_tags()):
+        #         if tag.startswith(partial):
 
 
+# TODO: REPL knows way too much of the session's implementation details. It should not.
+# TODO: autorun file info when cursor moves
 class REPL(cmd.Cmd):
     prompt = "> "
 
-    def __init__(self, items: list[Path], completer: Completer):
-        self.index = 0
-        self.items = items
+    def __init__(self, session: ReviewSession):
+        self.session = session
+        self.pt: PromptSession = PromptSession()
+        self.completer = TagCompleter(session.known_tags)
 
-        self.promptsession: PromptSession = PromptSession()
-        self.completer = completer
+        # TODO: add Wordcompleter that reads do_* methods from the REPL-class
 
         super().__init__()
 
-    @property
-    def current_item(self) -> Path:
-        return self.items[self.index]
+    # TODO: prompt not printing
+    def _prompt(self):
+        s = self.session
+        return f"{(s.index + 1) / {len(self.items)}} {s.current.name}"
 
-    def refresh(self):
-        """Print current item and position"""
-        print(f"({self.index + 1}/{len(self.items)}) {self.current_item}")
-
-    def preloop(self):
-        self.refresh()
-        return super().preloop()
-
-    def postcmd(self, stop, line):
-        if stop:
-            return stop
-
-        self.refresh()
-        return stop
+    def run(self):
+        # TODO: move elsewhere, perhaps init
+        completer = WordCompleter(
+            [k.removeprefix("do_") for k in vars(REPL) if k.startswith("do_")]
+        )
+        while True:
+            try:
+                line = self.pt.prompt(self._prompt(completer))
+            except (EOFError, KeyboardInterrupt):
+                break
+            if self.onecmd(line):
+                break
 
     def do_goto(self, arg):
         """Go to position (indexed from 1)"""
@@ -101,18 +117,18 @@ class REPL(cmd.Cmd):
             return
 
         if not 1 <= position <= len(self.items):
-            print(f"{position} not in range [1,{len(self.items)}]")
+            print(f"{position} not in range [1,{len(self.session.items)}]")
             return
 
-        self.index = position - 1
+        self.session.index = position - 1
 
     def do_prev(self, arg):
         """Go back"""
-        self.index = max(0, self.index - 1)
+        self.session.index = max(0, self.session.index - 1)
 
     def do_next(self, arg):
         """Move along"""
-        self.index = min(len(self.items) - 1, self.index + 1)
+        self.session.index = min(len(self.session.items) - 1, self.session.index + 1)
 
     def do_exit(self, arg):
         """Exit the REPL"""
@@ -124,8 +140,23 @@ class REPL(cmd.Cmd):
         return True
 
     def do_add(self, arg):
-        result = self.promptsession.prompt("Add tags: ", completer=self.completer)
+        result = self.pt.prompt("Add tags: ", completer=self.completer)
 
-        new_tags = {x.replace("]", "").strip() for x in re.split(r"[\[,]", result)}
+        self.session.add_tags(result)
 
-        print(result, new_tags)
+        print(result)
+
+
+@click.command()
+@click.argument("file", type=click.File("r"))
+@click.pass_obj
+def review(vault: LazyVault, file: TextIO):
+    lines = [Path(l.strip()) for l in file]
+
+    # TODO: still bug when reading from stdin
+
+    session = ReviewSession(vault, lines)
+
+    repl = REPL(session)
+
+    repl.cmdloop()

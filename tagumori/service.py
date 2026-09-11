@@ -39,6 +39,7 @@ def _db_to_ast(file_tags: Sequence[Row]) -> Expr:
     return And(roots)
 
 
+# TODO: could use a dedicated return type
 def _ast_to_paths(node: Expr, prefix=()) -> list[tuple[str, ...]]:
     match node:
         case Tag(name, None):
