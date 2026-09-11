@@ -184,7 +184,13 @@ def execute_query(
     query_str = ",".join(query_parts)
 
     if query_str:
-        ids = search(conn, query_str, not ignore_tag_case)
+        # pass lambdafunc to let dependent funcs to get file ids lazily
+        ids = search(
+            conn,
+            query_str,
+            lambda: {x.id for x in crud.file.get_all(conn)},
+            not ignore_tag_case,
+        )
         files = crud.file.get_many(conn, list(ids))
     else:
         files = crud.file.get_all(conn)

@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from sqlite3 import Connection
 
 from tagumori.query.ast import Expr, Transformer, validate_for_storage
@@ -12,10 +13,15 @@ def _string_to_ast(string: str) -> Expr:
     return ast
 
 
-def search(conn: Connection, string: str, case: bool = True) -> set[int]:
+def search(
+    conn: Connection,
+    string: str,
+    get_all_ids: Callable[[], set[int]],
+    case: bool = True,
+) -> set[int]:
     ast = _string_to_ast(string)
     query_plan = simplify(to_query_plan(ast))
-    return execute(conn, query_plan, case)
+    return execute(conn, query_plan, get_all_ids, case)
 
 
 def parse_for_storage(string) -> Expr:

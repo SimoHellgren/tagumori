@@ -1,9 +1,9 @@
 import sqlite3
 from collections import Counter
+from collections.abc import Callable
 from functools import cache, reduce
 from itertools import chain
 
-from tagumori import crud
 from tagumori.query.planner import (
     QP_And,
     QP_Not,
@@ -97,11 +97,14 @@ def find_all(conn, path: TagPath, case):
     return {x["file_id"] for x in conn.execute(q, values).fetchall()}
 
 
-def execute(conn: sqlite3.Connection, qp: QueryPlan, case: bool = True):
-    # cached func for use with NOT
-    @cache
-    def get_all_file_ids():
-        return {x.id for x in crud.file.get_all(conn)}
+def execute(
+    conn: sqlite3.Connection,
+    qp: QueryPlan,
+    get_all_ids: Callable[[], set[int]],
+    case: bool = True,
+):
+    # cache for use with NOT
+    universe = cache(get_all_ids)
 
     def _exec(qp: QueryPlan):
         """Inner function to simplify calling and caching"""
@@ -133,6 +136,6 @@ def execute(conn: sqlite3.Connection, qp: QueryPlan, case: bool = True):
                 return {x for x, count in c.items() if count == 1}
 
             case QP_Not(operand):
-                return get_all_file_ids() - _exec(operand)
+                return universe() - _exec(operand)
 
     return _exec(qp)

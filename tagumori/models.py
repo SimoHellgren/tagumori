@@ -4,7 +4,7 @@ from pathlib import Path
 from sqlite3 import Row
 from typing import Self
 
-# from tagumori.query.ast import Expr
+from tagumori.query.ast import Expr
 
 
 class RowModel:
@@ -63,7 +63,7 @@ class Query(RowModel):
         )
 
 
-# @dataclass
-# class TaggedFile:
-#     file: File
-#     tags: Expr | None = None
+@dataclass
+class TaggedFile:
+    file: File
+    tags: Expr | None = None
