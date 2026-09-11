@@ -4,7 +4,6 @@ import pytest
 
 from tagumori import crud
 from tagumori.crud.file import _get_inode_and_device
-from tagumori.models import Tag
 
 
 class TestTagCRUD:
@@ -419,7 +418,7 @@ class TestFileTag:
 
 class TestTagalong:
     @pytest.fixture
-    def two_tags(self, conn) -> tuple[Tag, Tag]:
+    def two_tags(self, conn) -> tuple[int, int]:
         t1 = crud.tag.create(conn, "rock")
         t2 = crud.tag.create(conn, "guitar")
         return t1.id, t2.id
