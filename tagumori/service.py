@@ -1,4 +1,5 @@
 from collections import defaultdict
+from collections.abc import Sequence
 from itertools import groupby
 from pathlib import Path
 from sqlite3 import Connection, Row
@@ -11,7 +12,7 @@ from tagumori.utils import compile_pattern
 
 
 # utilities for turning the db file_tag structures to AST and paths
-def _db_to_ast(file_tags: list[Row]) -> Expr:
+def _db_to_ast(file_tags: Sequence[Row]) -> Expr:
     """Turn db file_tag rows into an AST (with AND)"""
     nodes: dict[int, Tag] = {}
     children: dict[int, list[Tag]] = defaultdict(list)
@@ -51,7 +52,7 @@ def _ast_to_paths(node: Expr, prefix=()) -> list[tuple[str, ...]]:
             return []
 
 
-def _db_tags_to_paths(file_tags: list[Row]) -> set[tuple[str, ...]]:
+def _db_tags_to_paths(file_tags: Sequence[Row]) -> set[tuple[str, ...]]:
     return set(_ast_to_paths(_db_to_ast(file_tags)))
 
 
@@ -72,7 +73,10 @@ def attach_tree(
 
 
 def add_tags_to_files(
-    conn: Connection, files: list[Path], tags: list[str], apply_tagalongs: bool = True
+    conn: Connection,
+    files: Sequence[Path],
+    tags: Sequence[str],
+    apply_tagalongs: bool = True,
 ):
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
 
@@ -89,7 +93,9 @@ def add_tags_to_files(
         )
 
 
-def remove_tags_from_files(conn: Connection, files: list[Path], tags: list[str]):
+def remove_tags_from_files(
+    conn: Connection, files: Sequence[Path], tags: Sequence[str]
+):
     # non-existing files are skipped here due to how get_many_by_path works.
     file_ids = [x.id for x in crud.file.get_many_by_path(conn, files)]
 
@@ -107,7 +113,7 @@ def remove_tags_from_files(conn: Connection, files: list[Path], tags: list[str])
 
 
 def set_tags_on_files(
-    conn: Connection, files: list[Path], tags: Expr, apply_tagalongs: bool = True
+    conn: Connection, files: Sequence[Path], tags: Expr, apply_tagalongs: bool = True
 ):
     tag_expr = ",".join(tags)
     node = parse_for_storage(tag_expr)
@@ -134,7 +140,7 @@ def set_tags_on_files(
     add_tags_to_files(conn, files, tags, apply_tagalongs)
 
 
-def drop_file_tags(conn: Connection, files: list[Path], retain_file: bool = False):
+def drop_file_tags(conn: Connection, files: Sequence[Path], retain_file: bool = False):
     file_ids = [x.id for x in crud.file.get_many_by_path(conn, files)]
     for file_id in file_ids:
         crud.file_tag.drop_for_file(conn, file_id)
@@ -143,7 +149,7 @@ def drop_file_tags(conn: Connection, files: list[Path], retain_file: bool = Fals
             crud.file.delete(conn, file_id)
 
 
-def get_files_with_tags(conn: Connection, files: list[Path]) -> dict[Path, dict]:
+def get_files_with_tags(conn: Connection, files: Sequence[Path]) -> dict[Path, dict]:
     file_records = crud.file.get_many_by_path(conn, files)
     ids = [file.id for file in file_records]
     tags = crud.file_tag.get_by_file_ids(conn, ids)
@@ -159,8 +165,8 @@ def get_files_with_tags(conn: Connection, files: list[Path]) -> dict[Path, dict]
 
 def execute_query(
     conn: Connection,
-    select_strs: list[str],
-    exclude_strs: list[str],
+    select_strs: Sequence[str],
+    exclude_strs: Sequence[str],
     ignore_tag_case: bool = False,
     pattern: str = ".*",
     ignore_case: bool = False,
