@@ -149,7 +149,7 @@ def drop_file_tags(conn: Connection, files: Sequence[Path], retain_file: bool = 
             crud.file.delete(conn, file_id)
 
 
-def get_files_with_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
+def lookup_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
     ids = [file.id for file in files]
     tags = crud.file_tag.get_by_file_ids(conn, ids)
 
@@ -157,6 +157,28 @@ def get_files_with_tags(conn: Connection, files: Sequence[File]) -> list[TaggedF
     lookup = {k: list(v) for k, v in groupby(tags, key=lambda x: x["file_id"])}
 
     return [TaggedFile(f, _db_to_ast(lookup.get(f.id, []))) for f in files]
+
+
+def list_files(
+    conn: Connection,
+    select: tuple[str, ...],
+    exclude: tuple[str, ...],
+    ignore_tag_case: bool,
+    pattern: str,
+    ignore_case: bool,
+    invert_match: bool,
+    long: bool,
+) -> list[TaggedFile]:
+    files = execute_query(
+        conn, select, exclude, ignore_tag_case, pattern, ignore_case, invert_match
+    )
+
+    if long:
+        files_with_tags = lookup_tags(conn, files)
+    else:
+        files_with_tags = [TaggedFile(f, None) for f in files]
+
+    return files_with_tags
 
 
 def execute_query(

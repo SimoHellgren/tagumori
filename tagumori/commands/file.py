@@ -76,7 +76,7 @@ def info(vault: LazyVault, files: Sequence[Path], inode: int):
         else:
             records = crud.file.get_many_by_path(conn, files)
 
-        files_with_tags = service.get_files_with_tags(conn, records)
+        files_with_tags = service.lookup_tags(conn, records)
 
     for file in files_with_tags:
         print_box(

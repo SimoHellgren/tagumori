@@ -6,7 +6,7 @@ import click
 
 from tagumori import crud, service
 from tagumori.commands.context import LazyVault
-from tagumori.models import Query, TaggedFile
+from tagumori.models import Query
 from tagumori.render import format_file_output
 
 
@@ -111,7 +111,7 @@ def run(
             if not re.match(pattern, query.name):
                 continue
 
-            files = service.execute_query(
+            files = service.list_files(
                 conn,
                 query.select_tags,
                 query.exclude_tags,
@@ -119,17 +119,10 @@ def run(
                 query.pattern,
                 bool(query.ignore_case),
                 bool(query.invert_match),
+                long,
             )
 
-            if long:
-                files_with_tags = service.get_files_with_tags(conn, files)
-
-            else:
-                files_with_tags = [TaggedFile(file, None) for file in files]
-
-            output_lines = format_file_output(
-                files_with_tags, long, relative_to, prefix
-            )
+            output_lines = format_file_output(files, relative_to, prefix)
 
             if shuffle:
                 # mutation but oh well

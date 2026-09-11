@@ -5,7 +5,6 @@ import click
 from tagumori import service
 from tagumori.commands import db, file, query, review, tag, tagalong
 from tagumori.commands.context import LazyVault
-from tagumori.models import TaggedFile
 from tagumori.render import format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
@@ -146,18 +145,19 @@ def ls(
     relative_to: Path,
     prefix: str,
 ):
-    # TODO: could potentially fetch tags already in service
     with vault as conn:
-        paths = service.execute_query(
-            conn, select, exclude, ignore_tag_case, pattern, ignore_case, invert_match
+        results = service.list_files(
+            conn,
+            select,
+            exclude,
+            ignore_tag_case,
+            pattern,
+            ignore_case,
+            invert_match,
+            long,
         )
 
-        if long:
-            files_with_tags = service.get_files_with_tags(conn, paths)
-        else:
-            files_with_tags = [TaggedFile(f, None) for f in paths]
-
-    for msg in format_file_output(files_with_tags, long, relative_to, prefix):
+    for msg in format_file_output(results, relative_to, prefix):
         click.echo(msg)
 
 

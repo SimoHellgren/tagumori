@@ -9,7 +9,7 @@ from tagumori.models import TaggedFile
 
 
 def format_file_output(
-    files: Sequence[TaggedFile], long: bool, relative_to: Path, prefix: str
+    files: Sequence[TaggedFile], relative_to: Path, prefix: str
 ) -> Generator[str]:
     # TODO: the data flow / interface is a bit messy
     for file in files:
@@ -24,8 +24,8 @@ def format_file_output(
         msg = click.style(display_path, fg="green")
 
         # walrus protects from printin "None" when there are no tags
-        if long and (ast := file.tags):
-            msg += "\t" + click.style(ast, fg="cyan")
+        if file.tags:
+            msg += "\t" + click.style(file.tags, fg="cyan")
 
         yield msg
 
