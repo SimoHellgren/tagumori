@@ -35,7 +35,7 @@ class ReviewSession:
         with self.vault as conn:
             service.add_tags_to_files(conn, [self.current], [expr])
 
-        # using private method but oh well
+        # TODO: should probably make _ast_to_paths a public method
         new_tags = {*flatten(service._ast_to_paths(node))}
         self.known_tags |= new_tags
 
@@ -86,23 +86,19 @@ class REPL(cmd.Cmd):
         self.pt: PromptSession = PromptSession()
         self.completer = TagCompleter(session.known_tags)
 
-        # TODO: add Wordcompleter that reads do_* methods from the REPL-class
-
         super().__init__()
 
-    # TODO: prompt not printing
     def _prompt(self):
         s = self.session
-        return f"{(s.index + 1) / {len(self.items)}} {s.current.name}"
+        return f"{(s.index + 1)} / {len(s.items)} {s.current.name} > "
 
     def run(self):
         # TODO: move elsewhere, perhaps init
-        completer = WordCompleter(
-            [k.removeprefix("do_") for k in vars(REPL) if k.startswith("do_")]
-        )
+        commands = [k.removeprefix("do_") for k in vars(REPL) if k.startswith("do_")]
+        completer = WordCompleter(sorted([*commands, "help"]))
         while True:
             try:
-                line = self.pt.prompt(self._prompt(completer))
+                line = self.pt.prompt(self._prompt(), completer=completer)
             except (EOFError, KeyboardInterrupt):
                 break
             if self.onecmd(line):
@@ -159,4 +155,4 @@ def review(vault: LazyVault, file: TextIO):
 
     repl = REPL(session)
 
-    repl.cmdloop()
+    repl.run()
