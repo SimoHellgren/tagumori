@@ -11,6 +11,7 @@ from prompt_toolkit.document import Document
 from tagumori import crud, service
 from tagumori.commands.context import LazyVault
 from tagumori.query import parse_for_storage
+from tagumori.render import print_file_info
 
 flatten = chain.from_iterable
 
@@ -40,6 +41,16 @@ class ReviewSession:
             return
 
         self.index = index
+
+    def file_info(self) -> None:
+        with self.vault as conn:
+            file = crud.file.get_by_path(conn, self.current)
+            tagged_file = service.lookup_tags(conn, [file])
+
+        if not tagged_file:
+            print("File not in vault")
+
+        print_file_info(tagged_file[0])
 
     def add_tags(self, expr: str) -> None:
         # validate before hitting db
@@ -160,6 +171,9 @@ class REPL(cmd.Cmd):
         self.session.add_tags(result)
 
         print(result)
+
+    def do_info(self, arg):
+        self.session.file_info()
 
 
 @click.command()

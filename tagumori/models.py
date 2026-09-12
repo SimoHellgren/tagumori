@@ -1,10 +1,18 @@
 import json
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from sqlite3 import Row
 from typing import Self
 
 from tagumori.query.ast import Expr
+
+
+class FileStatus(Enum):
+    OK = "ok"
+    NOT_FOUND = "not_found"
+    INODE_MISMATCH = "mismatch"
+    INODE_MISSING = "inode_missing"
 
 
 class RowModel:
@@ -29,6 +37,21 @@ class File(RowModel):
             "path": Path(row["path"]),
         }
         return cls(**data)
+
+    # TODO: assess if this place makes the most sense or not
+    def status(self) -> FileStatus:
+        if not self.path.exists():
+            return FileStatus.NOT_FOUND
+
+        if not self.inode:
+            return FileStatus.INODE_MISSING
+
+        stat = self.path.stat()
+
+        if not (self.inode == stat.st_ino and self.device == stat.st_dev):
+            return FileStatus.INODE_MISMATCH
+
+        return FileStatus.OK
 
 
 @dataclass(frozen=True, slots=True)

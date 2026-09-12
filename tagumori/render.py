@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from tagumori.models import TaggedFile
+from tagumori.models import FileStatus, TaggedFile
 
 
 def format_file_output(
@@ -41,3 +41,31 @@ def print_box(title: str, lines: list[str]):
         padding = width - 1 - len(click.unstyle(line))
         click.echo(f"│ {line}{' ' * padding}│")
     click.echo(f"└{'─' * width}┘")
+
+
+def check_path(p: Path) -> dict:
+    if p.exists():
+        return {"text": "Exists", "fg": "green"}
+
+    return {"text": "Not found", "fg": "red"}
+
+
+def check_inode(file: TaggedFile) -> dict:
+    status = file.file.status()
+    return {
+        FileStatus.OK: {"text": "OK", "fg": "green"},
+        FileStatus.INODE_MISMATCH: {"text": "Mismatch", "fg": "red"},
+        FileStatus.INODE_MISSING: {"text": "Inode missing", "fg": "yellow"},
+        FileStatus.NOT_FOUND: {"text": "OK", "fg": "green"},  # handled by check_path
+    }[status]
+
+
+def print_file_info(file: TaggedFile) -> None:
+    print_box(
+        str(file.path),
+        [
+            f"Tags: {file.tags or ''}",
+            "Path: " + click.style(**check_path(file.path)),
+            "Inode/device: " + click.style(**check_inode(file)),
+        ],
+    )
