@@ -1,68 +1,18 @@
-from enum import Enum
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 import click
 
 from tagumori import crud, service
 from tagumori.commands.context import LazyVault
-
-
-class FileStatus(Enum):
-    OK = "ok"
-    NOT_FOUND = "not_found"
-    INODE_MISMATCH = "mismatch"
-    INODE_MISSING = "inode_missing"
-
-
-def get_file_status(path: Path, record: dict):
-    if not path.exists():
-        return FileStatus.NOT_FOUND
-
-    if not record["inode"]:
-        return FileStatus.INODE_MISSING
-
-    stat = path.stat()
-
-    if not (record["inode"] == stat.st_ino and record["device"] == stat.st_dev):
-        return FileStatus.INODE_MISMATCH
-
-    return FileStatus.OK
+from tagumori.models import FileStatus
+from tagumori.render import print_file_info
 
 
 @click.group(help="File management")
 @click.pass_obj
 def file(vault: LazyVault):
     pass
-
-
-def print_box(title: str, lines: list[str]):
-    width = max(len(click.unstyle(line)) for line in [title, *lines]) + 2
-
-    click.echo(f"┌{'─' * width}┐")
-    click.echo(f"│ {title.ljust(width - 1)}│")
-    click.echo(f"├{'─' * width}┤")
-    for line in lines:
-        padding = width - 1 - len(click.unstyle(line))
-        click.echo(f"│ {line}{' ' * padding}│")
-    click.echo(f"└{'─' * width}┘")
-
-
-def check_path(p: Path) -> dict:
-    if p.exists():
-        return {"text": "Exists", "fg": "green"}
-
-    return {"text": "Not found", "fg": "red"}
-
-
-def check_inode(p: Path, record: dict) -> dict:
-    status = get_file_status(p, record)
-    return {
-        FileStatus.OK: {"text": "OK", "fg": "green"},
-        FileStatus.INODE_MISMATCH: {"text": "Mismatch", "fg": "red"},
-        FileStatus.INODE_MISSING: {"text": "Inode missing", "fg": "yellow"},
-        FileStatus.NOT_FOUND: {"text": "OK", "fg": "green"},  # handled by check_path
-    }[status]
 
 
 @file.command(help="Show file info.")
@@ -83,24 +33,13 @@ def info(vault: LazyVault, files: Sequence[Path], inode: int):
             if not records:
                 return
 
-            lookup_paths = [Path(r["path"]) for r in records]
-
         else:
-            lookup_paths = files
+            records = crud.file.get_many_by_path(conn, files)
 
-        files_with_tags = service.get_files_with_tags(conn, lookup_paths)
+        files_with_tags = service.lookup_tags(conn, records)
 
-    for path, data in files_with_tags.items():
-        record = data["file"]
-
-        print_box(
-            str(path),
-            [
-                f"Tags: {data['ast'] or ''}",
-                "Path: " + click.style(**check_path(path)),
-                "Inode/device: " + click.style(**check_inode(path, record)),
-            ],
-        )
+    for file in files_with_tags:
+        print_file_info(file)
 
 
 @file.command(help="Add files to db (without tags).")
@@ -126,7 +65,7 @@ def drop(vault: LazyVault, files: Sequence[Path]):
             abort=True,
         )
         for file in records:
-            crud.file.delete(conn, file["id"])
+            crud.file.delete(conn, file.id)
 
 
 @file.command(help="Edit file record.")
@@ -163,13 +102,13 @@ def edit(
         records = crud.file.get_many_by_path(conn, files)
         if path:
             stat = path.stat()  # stat the new file
-            crud.file.update(conn, records[0]["id"], path, stat.st_ino, stat.st_dev)
+            crud.file.update(conn, records[0].id, path, stat.st_ino, stat.st_dev)
 
         elif refresh:
             for record in records:
-                p = Path(record["path"])
+                p = Path(record.path)
                 stat = p.stat()
-                crud.file.update(conn, record["id"], p, stat.st_ino, stat.st_dev)
+                crud.file.update(conn, record.id, p, stat.st_ino, stat.st_dev)
 
         elif relocate:
             for record in records:
@@ -186,8 +125,9 @@ def check(vault: LazyVault, fix: bool):
         all_files = crud.file.get_all(conn)
 
         for record in all_files:
-            p = Path(record["path"])
-            status = get_file_status(p, record)
+            p = Path(record.path)
+
+            status = record.status()
 
             if status == FileStatus.OK:
                 continue
@@ -195,7 +135,7 @@ def check(vault: LazyVault, fix: bool):
             # Auto-fix missing inodes (file exists, just needs stat)
             if status == FileStatus.INODE_MISSING and fix:
                 stat = p.stat()
-                crud.file.update(conn, record["id"], p, stat.st_ino, stat.st_dev)
+                crud.file.update(conn, record.id, p, stat.st_ino, stat.st_dev)
                 issues.append((p, status, True))
             else:
                 issues.append((p, status, False))
@@ -204,6 +144,7 @@ def check(vault: LazyVault, fix: bool):
         click.echo("No issues found.")
         return
 
+    # TODO: extract styling to render
     for path, status, fixed in issues:
         label = {
             FileStatus.NOT_FOUND: click.style("NOT FOUND", fg="red"),
@@ -250,6 +191,6 @@ def mv(vault: LazyVault, sources: Sequence[Path], dst: Path, force: bool):
 
             shutil.move(src, actual_dst)
             stat = actual_dst.stat()
-            crud.file.update(conn, record["id"], actual_dst, stat.st_ino, stat.st_dev)
+            crud.file.update(conn, record.id, actual_dst, stat.st_ino, stat.st_dev)
 
             click.echo(f"Moved {src} -> {actual_dst}")

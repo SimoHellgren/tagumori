@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from click.testing import CliRunner
 
@@ -5,12 +7,12 @@ from tagumori.cli import cli
 
 
 @pytest.fixture
-def runner():
+def runner() -> CliRunner:
     return CliRunner()
 
 
 @pytest.fixture
-def vault(tmp_path):
+def vault(tmp_path) -> Path:
     """Creates a temporary vault file and returns its path."""
     vault_path = tmp_path / "test_vault.db"
     runner = CliRunner()
@@ -19,7 +21,7 @@ def vault(tmp_path):
 
 
 @pytest.fixture
-def sample_file(tmp_path):
+def sample_file(tmp_path) -> Path:
     """Creates a temporary file to tag."""
     file_path = tmp_path / "sample.txt"
     file_path.write_text("test content")
@@ -27,7 +29,7 @@ def sample_file(tmp_path):
 
 
 @pytest.fixture
-def tagged_file(runner, vault, sample_file):
+def tagged_file(runner, vault, sample_file) -> Path:
     """A sample file already tagged with 'rock'."""
     runner.invoke(
         cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
@@ -36,7 +38,7 @@ def tagged_file(runner, vault, sample_file):
 
 
 @pytest.fixture
-def sample_files(tmp_path):
+def sample_files(tmp_path) -> list[Path]:
     """Creates two temporary files for multi-file tests."""
     files = [tmp_path / "file1.txt", tmp_path / "file2.txt"]
     for f in files:

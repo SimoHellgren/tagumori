@@ -1,8 +1,9 @@
 from pathlib import Path
 
 from tagumori import crud
-from tagumori.query import search
-from tagumori.query.executor import execute, find_all
+from tagumori.query import search as _search
+from tagumori.query.executor import execute as _execute
+from tagumori.query.executor import find_all
 from tagumori.query.planner import (
     QP_And,
     QP_Not,
@@ -13,6 +14,25 @@ from tagumori.query.planner import (
     SegmentWildCardSingle,
     TagPath,
 )
+
+
+def get_all_ids(conn):
+    """Returns set of all file ids in db"""
+    return {x.id for x in crud.file.get_all(conn)}
+
+
+def search(conn, string, case=True):
+    """Wraps actual search function in order to not have to provide
+    the universe separately every time.
+    """
+    return _search(conn, string, lambda: get_all_ids(conn), case)
+
+
+def execute(conn, qp, case=True):
+    """Wraps actual execute function in order to not have to provide
+    the universe separately every time.
+    """
+    return _execute(conn, qp, lambda: get_all_ids(conn), case)
 
 
 def make_file(conn, path_str, tag_paths):
@@ -26,8 +46,8 @@ def make_file(conn, path_str, tag_paths):
         parent_id = None
         for tag_name in tag_path:
             tag = crud.tag.get_or_create(conn, tag_name)
-            parent_id = crud.file_tag.attach(conn, file_row["id"], tag["id"], parent_id)
-    return file_row["id"]
+            parent_id = crud.file_tag.attach(conn, file_row.id, tag.id, parent_id)
+    return file_row.id
 
 
 class TestFindAllSimple:
@@ -115,7 +135,6 @@ class TestFindAllCaseInsensitive:
 class TestExecuteOperators:
     def setup_method(self):
         """Store expected ids for use in tests. Actual setup in each test via conn."""
-        pass
 
     def _setup_three_files(self, conn):
         f1 = make_file(conn, "a.mp3", [("rock",)])

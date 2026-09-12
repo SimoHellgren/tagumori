@@ -1,5 +1,3 @@
-from typing import Optional
-
 import click
 
 from tagumori import crud
@@ -17,7 +15,7 @@ def tag(vault: LazyVault):
 @click.option("-n", "--name", type=click.STRING, required=True)
 @click.option("-c", "--category", type=click.STRING)
 @click.pass_obj
-def new_tag(vault: LazyVault, name: str, category: Optional[str]):
+def new_tag(vault: LazyVault, name: str, category: str | None):
     with vault as conn:
         crud.tag.create(conn, name, category)
 
@@ -70,10 +68,10 @@ def replace_tag(vault: LazyVault, old: tuple[str, ...], new: str, remove: bool):
         new_record = crud.tag.get_or_create(conn, new)
         olds = crud.tag.get_many_by_name(conn, old)
         for old_record in olds:
-            crud.file_tag.replace(conn, old_record["id"], new_record["id"])
+            crud.file_tag.replace(conn, old_record.id, new_record.id)
 
             if remove:
-                crud.tag.delete(conn, old_record["id"])
+                crud.tag.delete(conn, old_record.id)
 
 
 @tag.command(help="Removes all instances of a tag.", name="delete")
@@ -87,7 +85,7 @@ def remove_tag(vault: LazyVault, tags: tuple[str, ...]):
 
     with vault as conn:
         for tag in tags:
-            tag_id = crud.tag.get_by_name(conn, tag)[0]
+            tag_id = crud.tag.get_by_name(conn, tag).id
             crud.tag.delete(conn, tag_id)
 
 
@@ -105,11 +103,11 @@ def list_tags(
     invert_match: bool,
 ):
     with vault as conn:
-        tags = sorted(crud.tag.get_all(conn), key=lambda x: x["name"])
+        tags = sorted(crud.tag.get_all(conn), key=lambda x: x.name)
 
     regex = compile_pattern(pattern, ignore_case)
 
-    filtered = [t for t in tags if bool(regex.search(t["name"])) ^ invert_match]
+    filtered = [t for t in tags if bool(regex.search(t.name)) ^ invert_match]
 
     for tag in filtered:
-        click.echo(tag["name"] + (f" ({tag['category']})" if long else ""))
+        click.echo(tag.name + (f" ({tag.category})" if long else ""))

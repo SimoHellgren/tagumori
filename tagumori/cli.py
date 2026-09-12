@@ -1,11 +1,12 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 import click
 
 from tagumori import service
-from tagumori.commands import db, file, query, tag, tagalong
+from tagumori.commands import db, file, query, review, tag, tagalong
 from tagumori.commands.context import LazyVault
-from tagumori.utils import format_file_output
+from tagumori.render import format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
 
@@ -27,6 +28,7 @@ cli.add_command(tagalong.tagalong)
 cli.add_command(db.db)
 cli.add_command(file.file)
 cli.add_command(query.query)
+cli.add_command(review.review)
 
 
 @cli.command(help="Add tags to files")
@@ -47,8 +49,8 @@ cli.add_command(query.query)
 @click.pass_obj
 def add(
     vault: LazyVault,
-    files: tuple[Path, ...],
-    tags: tuple[str, ...],
+    files: Sequence[Path],
+    tags: Sequence[str],
     tagalongs: bool,
 ):
     with vault as conn:
@@ -65,7 +67,7 @@ def add(
 )
 @click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
 @click.pass_obj
-def remove(vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...]):
+def remove(vault: LazyVault, files: Sequence[Path], tags: Sequence[str]):
     with vault as conn:
         service.remove_tags_from_files(conn, files, tags)
 
@@ -86,9 +88,7 @@ def remove(vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...]):
     help="Apply / don't apply tagalongs.",
 )
 @click.pass_obj
-def set_(
-    vault: LazyVault, files: tuple[Path, ...], tags: tuple[str, ...], tagalongs: bool
-):
+def set_(vault: LazyVault, files: Sequence[Path], tags: Sequence[str], tagalongs: bool):
 
     with vault as conn:
         service.set_tags_on_files(conn, files, tags, tagalongs)
@@ -104,7 +104,7 @@ def set_(
 )
 @click.option("--retain-file", type=click.BOOL, is_flag=True)
 @click.pass_obj
-def drop(vault: LazyVault, files: tuple[int, ...], retain_file: bool):
+def drop(vault: LazyVault, files: Sequence[int], retain_file: bool):
     with vault as conn:
         service.drop_file_tags(conn, files, retain_file)
 
@@ -135,8 +135,8 @@ def drop(vault: LazyVault, files: tuple[int, ...], retain_file: bool):
 def ls(
     vault: LazyVault,
     long: bool,
-    select: tuple[str, ...],
-    exclude: tuple[str, ...],
+    select: Sequence[str],
+    exclude: Sequence[str],
     ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,
@@ -144,18 +144,19 @@ def ls(
     relative_to: Path,
     prefix: str,
 ):
-    # TODO: could potentially fetch tags already in service
     with vault as conn:
-        paths = service.execute_query(
-            conn, select, exclude, ignore_tag_case, pattern, ignore_case, invert_match
+        results = service.list_files(
+            conn,
+            select,
+            exclude,
+            ignore_tag_case,
+            pattern,
+            ignore_case,
+            invert_match,
+            long,
         )
 
-        if long:
-            files_with_tags = service.get_files_with_tags(conn, paths)
-        else:
-            files_with_tags = {f: {} for f in paths}
-
-    for msg in format_file_output(files_with_tags, long, relative_to, prefix):
+    for msg in format_file_output(results, relative_to, prefix):
         click.echo(msg)
 
 

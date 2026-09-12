@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from tagumori.query.parser import Transformer as StandaloneTransformer
@@ -38,7 +39,7 @@ class OnlyOne:
 
 @dataclass
 class And:
-    operands: list["Expr"]
+    operands: Sequence["Expr"]
 
     def __str__(self) -> str:
         return ",".join(str(op) for op in self.operands)

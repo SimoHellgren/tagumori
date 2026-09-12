@@ -1,16 +1,18 @@
 from collections import defaultdict
+from collections.abc import Sequence
 from itertools import groupby
 from pathlib import Path
 from sqlite3 import Connection, Row
 
 from tagumori import crud
+from tagumori.models import File, TaggedFile
 from tagumori.query import parse_for_storage, search
 from tagumori.query.ast import And, Expr, Tag
 from tagumori.utils import compile_pattern
 
 
 # utilities for turning the db file_tag structures to AST and paths
-def _db_to_ast(file_tags: list[Row]) -> Expr:
+def _db_to_ast(file_tags: Sequence[Row]) -> Expr:
     """Turn db file_tag rows into an AST (with AND)"""
     nodes: dict[int, Tag] = {}
     children: dict[int, list[Tag]] = defaultdict(list)
@@ -37,6 +39,7 @@ def _db_to_ast(file_tags: list[Row]) -> Expr:
     return And(roots)
 
 
+# TODO: could use a dedicated return type
 def _ast_to_paths(node: Expr, prefix=()) -> list[tuple[str, ...]]:
     match node:
         case Tag(name, None):
@@ -46,8 +49,11 @@ def _ast_to_paths(node: Expr, prefix=()) -> list[tuple[str, ...]]:
         case And(operands):
             return [p for op in operands for p in _ast_to_paths(op, prefix)]
 
+        case _:
+            return []
 
-def _db_tags_to_paths(file_tags: list[Row]) -> set[tuple[str, ...]]:
+
+def _db_tags_to_paths(file_tags: Sequence[Row]) -> set[tuple[str, ...]]:
     return set(_ast_to_paths(_db_to_ast(file_tags)))
 
 
@@ -57,10 +63,10 @@ def attach_tree(
     match node:
         case Tag(name, None):
             tag = crud.tag.get_or_create(conn, name)
-            crud.file_tag.attach(conn, file_id, tag["id"], parent_id)
+            crud.file_tag.attach(conn, file_id, tag.id, parent_id)
         case Tag(name, children):
             tag = crud.tag.get_or_create(conn, name)
-            filetag_id = crud.file_tag.attach(conn, file_id, tag["id"], parent_id)
+            filetag_id = crud.file_tag.attach(conn, file_id, tag.id, parent_id)
             attach_tree(conn, file_id, children, filetag_id)
         case And(operands):
             for op in operands:
@@ -68,9 +74,12 @@ def attach_tree(
 
 
 def add_tags_to_files(
-    conn: Connection, files: list[Path], tags: list[str], apply_tagalongs: bool = True
+    conn: Connection,
+    files: Sequence[Path],
+    tags: Sequence[str],
+    apply_tagalongs: bool = True,
 ):
-    file_ids = [x["id"] for x in crud.file.get_or_create_many(conn, files)]
+    file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
 
     tag_expr = ",".join(tags)
     node = parse_for_storage(tag_expr)
@@ -85,9 +94,11 @@ def add_tags_to_files(
         )
 
 
-def remove_tags_from_files(conn: Connection, files: list[Path], tags: list[str]):
+def remove_tags_from_files(
+    conn: Connection, files: Sequence[Path], tags: Sequence[str]
+):
     # non-existing files are skipped here due to how get_many_by_path works.
-    file_ids = [x["id"] for x in crud.file.get_many_by_path(conn, files)]
+    file_ids = [x.id for x in crud.file.get_many_by_path(conn, files)]
 
     tag_expr = ",".join(tags)
     node = parse_for_storage(tag_expr)
@@ -103,7 +114,7 @@ def remove_tags_from_files(conn: Connection, files: list[Path], tags: list[str])
 
 
 def set_tags_on_files(
-    conn: Connection, files: list[Path], tags: Expr, apply_tagalongs: bool = True
+    conn: Connection, files: Sequence[Path], tags: Expr, apply_tagalongs: bool = True
 ):
     tag_expr = ",".join(tags)
     node = parse_for_storage(tag_expr)
@@ -111,7 +122,7 @@ def set_tags_on_files(
     # remove unwanted paths
     desired_paths = set(_ast_to_paths(node))
 
-    file_ids = [x["id"] for x in crud.file.get_or_create_many(conn, files)]
+    file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
 
     db_tags = crud.file_tag.get_by_file_ids(conn, file_ids)
 
@@ -130,8 +141,8 @@ def set_tags_on_files(
     add_tags_to_files(conn, files, tags, apply_tagalongs)
 
 
-def drop_file_tags(conn: Connection, files: list[Path], retain_file: bool = False):
-    file_ids = [x["id"] for x in crud.file.get_many_by_path(conn, files)]
+def drop_file_tags(conn: Connection, files: Sequence[Path], retain_file: bool = False):
+    file_ids = [x.id for x in crud.file.get_many_by_path(conn, files)]
     for file_id in file_ids:
         crud.file_tag.drop_for_file(conn, file_id)
 
@@ -139,29 +150,47 @@ def drop_file_tags(conn: Connection, files: list[Path], retain_file: bool = Fals
             crud.file.delete(conn, file_id)
 
 
-def get_files_with_tags(conn: Connection, files: list[Path]) -> dict[Path, Expr]:
-    file_records = crud.file.get_many_by_path(conn, files)
-    ids = [file["id"] for file in file_records]
+def lookup_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
+    ids = [file.id for file in files]
     tags = crud.file_tag.get_by_file_ids(conn, ids)
 
     # tags are ordered by file id so we can groupby safely
     lookup = {k: list(v) for k, v in groupby(tags, key=lambda x: x["file_id"])}
 
-    return {
-        Path(f["path"]): {"file": f, "ast": _db_to_ast(lookup.get(f["id"], []))}
-        for f in file_records
-    }
+    return [TaggedFile(f, _db_to_ast(lookup.get(f.id, []))) for f in files]
+
+
+def list_files(
+    conn: Connection,
+    select: Sequence[str],
+    exclude: Sequence[str],
+    ignore_tag_case: bool,
+    pattern: str,
+    ignore_case: bool,
+    invert_match: bool,
+    long: bool,
+) -> list[TaggedFile]:
+    files = execute_query(
+        conn, select, exclude, ignore_tag_case, pattern, ignore_case, invert_match
+    )
+
+    if long:
+        files_with_tags = lookup_tags(conn, files)
+    else:
+        files_with_tags = [TaggedFile(f, None) for f in files]
+
+    return files_with_tags
 
 
 def execute_query(
     conn: Connection,
-    select_strs: list[str],
-    exclude_strs: list[str],
+    select_strs: Sequence[str],
+    exclude_strs: Sequence[str],
     ignore_tag_case: bool = False,
     pattern: str = ".*",
     ignore_case: bool = False,
     invert_match: bool = False,
-) -> list[Path]:
+) -> list[File]:
 
     query_parts = []
 
@@ -174,7 +203,13 @@ def execute_query(
     query_str = ",".join(query_parts)
 
     if query_str:
-        ids = search(conn, query_str, not ignore_tag_case)
+        # pass lambdafunc to let dependent funcs to get file ids lazily
+        ids = search(
+            conn,
+            query_str,
+            lambda: {x.id for x in crud.file.get_all(conn)},
+            not ignore_tag_case,
+        )
         files = crud.file.get_many(conn, list(ids))
     else:
         files = crud.file.get_all(conn)
@@ -182,14 +217,15 @@ def execute_query(
     regex = compile_pattern(pattern, ignore_case)
 
     return sorted(
-        Path(f["path"]) for f in files if bool(regex.search(f["path"])) ^ invert_match
+        (f for f in files if bool(regex.search(str(f.path))) ^ invert_match),
+        key=lambda f: f.path,
     )
 
 
-def relocate_file(conn: Connection, file: Row, search_root: Path):
+def relocate_file(conn: Connection, file: File, search_root: Path) -> None:
     """Finds a file by inode/device and updates its path."""
-    target_inode = file["inode"]
-    target_device = file["device"]
+    target_inode = file.inode
+    target_device = file.device
 
     for path in search_root.rglob("*"):
         if not path.is_file():
@@ -198,4 +234,4 @@ def relocate_file(conn: Connection, file: Row, search_root: Path):
         stat = path.stat()
 
         if stat.st_ino == target_inode and stat.st_dev == target_device:
-            crud.file.update(conn, file["id"], path, stat.st_ino, stat.st_dev)
+            crud.file.update(conn, file.id, path, stat.st_ino, stat.st_dev)

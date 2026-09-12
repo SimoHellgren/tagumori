@@ -54,9 +54,8 @@ def backup(vault: LazyVault, dest: Path, directory: Path):
         click.confirm(f"{backup_path} already exists. Overwrite?", abort=True)
         backup_path.unlink()
 
-    with vault as source:
-        with sqlite3.connect(backup_path) as destination:
-            source.backup(destination)
+    with vault as source, sqlite3.connect(backup_path) as destination:
+        source.backup(destination)
 
     click.echo(f"Backup created: {backup_path}")
 
@@ -92,7 +91,7 @@ def migrate_json(vault: LazyVault, json_vault: Path):
         target_rows = crud.tag.get_or_create_many(conn, targets)
 
         for source, target in zip(source_rows, target_rows):
-            crud.tagalong.create(conn, source["id"], target["id"])
+            crud.tagalong.create(conn, source.id, target.id)
 
         crud.tagalong.apply(conn)
 
