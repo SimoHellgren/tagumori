@@ -176,7 +176,11 @@ class REPL(cmd.Cmd):
 @click.argument("file", type=click.File("r"))
 @click.pass_obj
 def review(vault: LazyVault, file: TextIO):
-    lines = [Path(l.strip()) for l in file]
+    lines = [Path(l.strip()) for l in file if l.strip()]
+
+    if not lines:
+        click.echo("Input file is empty.")
+        return
 
     # TODO: still bug when reading from stdin
 
