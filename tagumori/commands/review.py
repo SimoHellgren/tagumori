@@ -100,12 +100,13 @@ class REPL(cmd.Cmd):
 
     def __init__(self, session: ReviewSession):
         self.session = session
-        self.pt: PromptSession = PromptSession()
 
-        # completer for tags
+        # session & completer for tags
+        self.tag_session: PromptSession = PromptSession()
         self.tag_completer = TagCompleter(session.known_tags)
 
-        # completer for commands
+        # session & completer for commands
+        self.cmd_session: PromptSession = PromptSession()
         commands = [
             k.removeprefix("do_")
             for k in vars(REPL)
@@ -122,7 +123,9 @@ class REPL(cmd.Cmd):
     def run(self):
         while True:
             try:
-                line = self.pt.prompt(self._prompt(), completer=self.cmd_completer)
+                line = self.cmd_session.prompt(
+                    self._prompt(), completer=self.cmd_completer
+                )
             except (EOFError, KeyboardInterrupt):
                 break
             if self.onecmd(line):
@@ -160,7 +163,7 @@ class REPL(cmd.Cmd):
         return True
 
     def do_add(self, arg):
-        tag_expr = self.pt.prompt("Add tags: ", completer=self.tag_completer)
+        tag_expr = self.tag_session.prompt("Add tags: ", completer=self.tag_completer)
 
         try:
             self.session.add_tags(tag_expr)
