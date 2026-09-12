@@ -28,6 +28,19 @@ class ReviewSession:
     def current(self) -> Path:
         return self.items[self.index]
 
+    def next(self) -> None:
+        self.index = min(self.index + 1, len(self.items) - 1)
+
+    def prev(self) -> None:
+        self.index = max(0, self.index - 1)
+
+    def goto(self, index: int) -> None:
+        if not 0 <= index <= len(self.items) - 1:
+            print("Index not in range")
+            return
+
+        self.index = index
+
     def add_tags(self, expr: str) -> None:
         # validate before hitting db
         node = parse_for_storage(expr)
@@ -76,7 +89,6 @@ class TagCompleter(Completer):
         #         if tag.startswith(partial):
 
 
-# TODO: REPL knows way too much of the session's implementation details. It should not.
 # TODO: autorun file info when cursor moves
 class REPL(cmd.Cmd):
     prompt = "> "
@@ -112,19 +124,19 @@ class REPL(cmd.Cmd):
             print(f"'{arg}' is not an integer")
             return
 
-        if not 1 <= position <= len(self.items):
-            print(f"{position} not in range [1,{len(self.session.items)}]")
-            return
-
-        self.session.index = position - 1
+        self.session.goto(position - 1)
 
     def do_prev(self, arg):
         """Go back"""
-        self.session.index = max(0, self.session.index - 1)
+        self.session.prev()
 
     def do_next(self, arg):
         """Move along"""
-        self.session.index = min(len(self.session.items) - 1, self.session.index + 1)
+        self.session.next()
+
+    def emptyline(self):
+        """Equivalent to do_next"""
+        self.do_next(None)
 
     def do_exit(self, arg):
         """Exit the REPL"""
