@@ -11,6 +11,7 @@ from prompt_toolkit.document import Document
 from tagumori import crud, service
 from tagumori.commands.context import LazyVault
 from tagumori.query import parse_for_storage
+from tagumori.query.parser import UnexpectedCharacters, UnexpectedToken
 from tagumori.render import print_file_info
 
 flatten = chain.from_iterable
@@ -159,11 +160,13 @@ class REPL(cmd.Cmd):
         return True
 
     def do_add(self, arg):
-        result = self.pt.prompt("Add tags: ", completer=self.tag_completer)
+        tag_expr = self.pt.prompt("Add tags: ", completer=self.tag_completer)
 
-        self.session.add_tags(result)
-
-        print(result)
+        try:
+            self.session.add_tags(tag_expr)
+            print(tag_expr)
+        except (ValueError, UnexpectedToken, UnexpectedCharacters) as e:
+            print(e)
 
     def do_info(self, arg):
         self.session.file_info()
