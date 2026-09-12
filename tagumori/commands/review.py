@@ -167,7 +167,7 @@ class REPL(cmd.Cmd):
 
         try:
             self.session.add_tags(tag_expr)
-            print(tag_expr)
+            print(f"Added: {tag_expr}")
         except (ValueError, UnexpectedToken, UnexpectedCharacters) as e:
             print(e)
 
