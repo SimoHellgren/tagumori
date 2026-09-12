@@ -69,7 +69,6 @@ DELIMS = "[,"
 
 class TagCompleter(Completer):
     # TODO: consider persisting to FileHistory (see prompt_toolkit docs)
-    # this should be a github issue, though
 
     """Completer for `tag[child,child[grandchild]]`-style expressions."""
 
@@ -83,24 +82,16 @@ class TagCompleter(Completer):
 
         partial = text[cut + 1 :].lstrip()
 
+        depth = text.count("[") - text.count("]")
+
+        if depth > 0 and text[-1] != ",":
+            yield Completion("]", start_position=0, display_meta="close group")
+
         # TODO: consider case-insensitive completions
         for tag in sorted(t for t in self.known_tags if t.startswith(partial)):
             yield Completion(tag, start_position=-len(partial))
 
-        # TODO: completions for at least ], perhaps [
-        # char_before_token = text[token_start - 1] if token_start > 0 else ""
-        # depth = text.count("[") - text.count("]")
-        # last_char = text[-1] if text else ""
 
-        # if depth > 0 and last_char != ",":
-        #     yield Completion("]", start_position=0, display_meta="close group")
-
-        # if char_before_token in ("[", ",", ""):
-        #     for tag in sorted(self.get_tags()):
-        #         if tag.startswith(partial):
-
-
-# TODO: autorun file info when cursor moves
 class REPL(cmd.Cmd):
     prompt = "> "
 
