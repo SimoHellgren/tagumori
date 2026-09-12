@@ -1,58 +1,18 @@
 from collections.abc import Sequence
-from enum import Enum
 from pathlib import Path
 
 import click
 
 from tagumori import crud, service
 from tagumori.commands.context import LazyVault
-from tagumori.models import File
-from tagumori.render import print_box
-
-
-class FileStatus(Enum):
-    OK = "ok"
-    NOT_FOUND = "not_found"
-    INODE_MISMATCH = "mismatch"
-    INODE_MISSING = "inode_missing"
-
-
-def get_file_status(record: File) -> FileStatus:
-    if not record.path.exists():
-        return FileStatus.NOT_FOUND
-
-    if not record.inode:
-        return FileStatus.INODE_MISSING
-
-    stat = record.path.stat()
-
-    if not (record.inode == stat.st_ino and record.device == stat.st_dev):
-        return FileStatus.INODE_MISMATCH
-
-    return FileStatus.OK
+from tagumori.models import FileStatus
+from tagumori.render import print_file_info
 
 
 @click.group(help="File management")
 @click.pass_obj
 def file(vault: LazyVault):
     pass
-
-
-def check_path(p: Path) -> dict:
-    if p.exists():
-        return {"text": "Exists", "fg": "green"}
-
-    return {"text": "Not found", "fg": "red"}
-
-
-def check_inode(record: File) -> dict:
-    status = get_file_status(record)
-    return {
-        FileStatus.OK: {"text": "OK", "fg": "green"},
-        FileStatus.INODE_MISMATCH: {"text": "Mismatch", "fg": "red"},
-        FileStatus.INODE_MISSING: {"text": "Inode missing", "fg": "yellow"},
-        FileStatus.NOT_FOUND: {"text": "OK", "fg": "green"},  # handled by check_path
-    }[status]
 
 
 @file.command(help="Show file info.")
@@ -79,14 +39,7 @@ def info(vault: LazyVault, files: Sequence[Path], inode: int):
         files_with_tags = service.lookup_tags(conn, records)
 
     for file in files_with_tags:
-        print_box(
-            str(file.path),
-            [
-                f"Tags: {file.tags or ''}",
-                "Path: " + click.style(**check_path(file.path)),
-                "Inode/device: " + click.style(**check_inode(file.file)),
-            ],
-        )
+        print_file_info(file)
 
 
 @file.command(help="Add files to db (without tags).")
@@ -173,7 +126,8 @@ def check(vault: LazyVault, fix: bool):
 
         for record in all_files:
             p = Path(record.path)
-            status = get_file_status(record)
+
+            status = record.status()
 
             if status == FileStatus.OK:
                 continue
@@ -190,6 +144,7 @@ def check(vault: LazyVault, fix: bool):
         click.echo("No issues found.")
         return
 
+    # TODO: extract styling to render
     for path, status, fixed in issues:
         label = {
             FileStatus.NOT_FOUND: click.style("NOT FOUND", fg="red"),

@@ -50,6 +50,7 @@ def check_path(p: Path) -> dict:
     return {"text": "Not found", "fg": "red"}
 
 
+# TODO: type for click.style arguments
 def check_inode(file: TaggedFile) -> dict:
     status = file.file.status()
     return {
