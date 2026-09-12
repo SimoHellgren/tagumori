@@ -45,10 +45,12 @@ class ReviewSession:
     def file_info(self) -> None:
         with self.vault as conn:
             file = crud.file.get_by_path(conn, self.current)
-            tagged_file = service.lookup_tags(conn, [file])
 
-        if not tagged_file:
-            print("File not in vault")
+            if not file:
+                print("File not in vault")
+                return
+
+            tagged_file = service.lookup_tags(conn, [file])
 
         print_file_info(tagged_file[0])
 
