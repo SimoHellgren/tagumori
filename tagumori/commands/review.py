@@ -118,7 +118,7 @@ class REPL(cmd.Cmd):
 
     def _prompt(self):
         s = self.session
-        return f"{(s.index + 1)} / {len(s.items)} {s.current.name} > "
+        return f"{(s.index + 1)}/{len(s.items)} {s.current.name} > "
 
     def run(self):
         while True:
