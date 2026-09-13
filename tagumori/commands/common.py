@@ -1,5 +1,7 @@
 """Module for common resources, such as cli option groups."""
 
+from pathlib import Path
+
 import click
 
 
@@ -25,5 +27,20 @@ def query_options(func):
     func = click.option(
         "-I", "--ignore-tag-case", is_flag=True, help="Ignore tag case."
     )(func)
+
+    return func
+
+
+def file_print_options(func):
+    func = click.option(
+        "-l", "--long", type=click.BOOL, is_flag=True, help="Long listing format."
+    )(func)
+    func = click.option(
+        "--relative-to",
+        type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+        default=Path("."),
+        help="Display paths relative to given directory.",
+    )(func)
+    func = click.option("--prefix", default="")(func)
 
     return func

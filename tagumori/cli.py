@@ -5,7 +5,7 @@ import click
 
 from tagumori import service
 from tagumori.commands import db, file, query, review, tag, tagalong
-from tagumori.commands.common import query_options, regex_options
+from tagumori.commands.common import file_print_options, query_options, regex_options
 from tagumori.commands.context import LazyVault
 from tagumori.render import format_file_output
 
@@ -113,16 +113,7 @@ def drop(vault: LazyVault, files: Sequence[Path], retain_file: bool):
 @cli.command(help="List files (with optional filters).")
 @query_options
 @regex_options
-@click.option(
-    "-l", "--long", type=click.BOOL, is_flag=True, help="Long listing format."
-)
-@click.option(
-    "--relative-to",
-    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
-    default=Path("."),
-    help="Display paths relative to given directory.",
-)
-@click.option("--prefix", default="")
+@file_print_options
 @click.pass_obj
 def ls(
     vault: LazyVault,
