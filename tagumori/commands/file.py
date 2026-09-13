@@ -119,7 +119,7 @@ def edit(
 @click.option("--fix", is_flag=True, help="Fix missing inodes by refreshing from path")
 @click.pass_obj
 def check(vault: LazyVault, fix: bool):
-    issues = []
+    issues: list[tuple[Path, FileStatus, bool]] = []
 
     with vault as conn:
         all_files = crud.file.get_all(conn)
