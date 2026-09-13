@@ -1,6 +1,6 @@
 import sqlite3
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import cache, reduce
 from itertools import chain
 
@@ -29,7 +29,7 @@ def _build_value(segment: Segment):
             return (None, 1, is_root, is_leaf)
 
 
-def find_all(conn, path: TagPath, case):
+def find_all(conn, path: Sequence[Segment], case):
     values_ph = ", ".join("(?,?,?,?,?)" for _ in path)
 
     # build values

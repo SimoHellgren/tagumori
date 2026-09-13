@@ -217,7 +217,8 @@ def validate_for_storage(node: Expr) -> bool:
         case Tag(_, None):
             return True
 
-        case Tag(_, children):
+        # if-condition makes mypy happy (otherwise thinks it can be None)
+        case Tag(_, children) if children is not None:
             return validate_for_storage(children)
 
         case And(operands):

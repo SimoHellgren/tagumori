@@ -29,4 +29,7 @@ class LazyVault:
         return self._get_conn().__enter__()
 
     def __exit__(self, *args):
+        # self._conn is basically guaranteed to exist, but this makes mypy happy
+        assert self._conn is not None
+
         return self._conn.__exit__(*args)
