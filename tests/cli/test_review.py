@@ -270,13 +270,13 @@ class TestREPL:
     def test_prompt_shows_position_and_filename(self, session, prompts, sample_files):
         repl = REPL(session)
 
-        assert repl._prompt() == f"1 / 2 {sample_files[0].name} > "
+        assert repl._prompt() == f"1/2 {sample_files[0].name} > "
 
     def test_prompt_tracks_the_cursor(self, session, prompts, sample_files):
         repl = REPL(session)
         session.next()
 
-        assert repl._prompt() == f"2 / 2 {sample_files[1].name} > "
+        assert repl._prompt() == f"2/2 {sample_files[1].name} > "
 
     def test_empty_line_advances(self, session, prompts):
         repl = REPL(session)
@@ -396,7 +396,7 @@ class TestReviewCommand:
         result = runner.invoke(cli, ["--vault", str(vault), "review", str(listing)])
 
         assert result.exit_code == 0
-        assert prompts.seen[0].startswith(f"1 / {len(sample_files)} ")
+        assert prompts.seen[0].startswith(f"1/{len(sample_files)} ")
 
     def test_runs_a_scripted_session(self, runner, vault, sample_files, prompts):
         listing = sample_files[0].parent / "list.txt"
