@@ -114,7 +114,10 @@ def remove_tags_from_files(
 
 
 def set_tags_on_files(
-    conn: Connection, files: Sequence[Path], tags: Expr, apply_tagalongs: bool = True
+    conn: Connection,
+    files: Sequence[Path],
+    tags: Sequence[str],
+    apply_tagalongs: bool = True,
 ):
     tag_expr = ",".join(tags)
     node = parse_for_storage(tag_expr)

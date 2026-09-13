@@ -28,7 +28,7 @@ class TagCRUD(BaseCRUD[Tag]):
         """
         return self._one_or_raise(conn.execute(q, (name,)).fetchone())
 
-    def get_or_create_many(self, conn: Connection, names: list[str]) -> list[Tag]:
+    def get_or_create_many(self, conn: Connection, names: Sequence[str]) -> list[Tag]:
         vals = _placeholders(len(names), "(?)")
 
         q = f"""

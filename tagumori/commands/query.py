@@ -126,7 +126,9 @@ def run(
 
             if shuffle:
                 # mutation but oh well
-                output_lines = sorted(output_lines, key=lambda x: random())
+                # also a bit of a silly hack to make mypy happy
+                # (format_file_output is a generator, so this one has to be one, too).
+                output_lines = (x for x in sorted(output_lines, key=lambda x: random()))
 
             if write:
                 path = write / query.name

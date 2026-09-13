@@ -104,7 +104,7 @@ def set_(vault: LazyVault, files: Sequence[Path], tags: Sequence[str], tagalongs
 )
 @click.option("--retain-file", type=click.BOOL, is_flag=True)
 @click.pass_obj
-def drop(vault: LazyVault, files: Sequence[int], retain_file: bool):
+def drop(vault: LazyVault, files: Sequence[Path], retain_file: bool):
     with vault as conn:
         service.drop_file_tags(conn, files, retain_file)
 
