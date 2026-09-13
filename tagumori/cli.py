@@ -11,6 +11,22 @@ from tagumori.render import format_file_output
 DEFAULT_VAULT_PATH = Path("./vault.db")
 
 
+def regex_options(func):
+    func = click.option(
+        "-p", "--pattern", help="Filter output by regex pattern.", default=r".*"
+    )(func)
+    func = click.option("-i", "--ignore-case", is_flag=True, help="Ignore regex case.")(
+        func
+    )
+    func = click.option(
+        "-v",
+        "--invert-match",
+        is_flag=True,
+        help="Inverts the regex match (not select/exclude).",
+    )(func)
+    return func
+
+
 @click.group()
 @click.option(
     "--vault",
@@ -116,14 +132,7 @@ def drop(vault: LazyVault, files: Sequence[Path], retain_file: bool):
 @click.option("-s", "--select", multiple=True)
 @click.option("-e", "--exclude", multiple=True)
 @click.option("-I", "--ignore-tag-case", is_flag=True, help="Ignore tag case.")
-@click.option("-p", "--pattern", help="Filter output by regex pattern.", default=r".*")
-@click.option("-i", "--ignore-case", is_flag=True, help="Ignore regex case.")
-@click.option(
-    "-v",
-    "--invert-match",
-    is_flag=True,
-    help="Inverts the regex match (not select/exclude).",
-)
+@regex_options
 @click.option(
     "--relative-to",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
