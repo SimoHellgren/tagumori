@@ -1,6 +1,7 @@
 import click
 
 from tagumori import crud
+from tagumori.commands.common import regex_options
 from tagumori.commands.context import LazyVault
 from tagumori.utils import compile_pattern
 
@@ -91,9 +92,7 @@ def remove_tag(vault: LazyVault, tags: tuple[str, ...]):
 
 @tag.command(help="List tags", name="ls")
 @click.option("-l", "long", type=click.BOOL, is_flag=True, help="Long listing format.")
-@click.option("-p", "--pattern", help="Filter output by regex pattern", default=r".*")
-@click.option("-i", "--ignore-case", is_flag=True)
-@click.option("-v", "--invert-match", is_flag=True)
+@regex_options
 @click.pass_obj
 def list_tags(
     vault: LazyVault,

@@ -5,6 +5,7 @@ from random import random
 import click
 
 from tagumori import crud, service
+from tagumori.commands.common import file_print_options, query_options, regex_options
 from tagumori.commands.context import LazyVault
 from tagumori.models import Query
 from tagumori.render import format_file_output
@@ -18,17 +19,8 @@ def query(vault: LazyVault):
 
 @query.command(help="Save a query")
 @click.argument("name", type=str)
-@click.option("-s", "--select", multiple=True)
-@click.option("-e", "--exclude", multiple=True)
-@click.option("-I", "--ignore-tag-case", is_flag=True, help="Ignore tag case.")
-@click.option("-p", "--pattern", help="Filter output by regex pattern.", default=r".*")
-@click.option("-i", "--ignore-case", is_flag=True, help="Ignore regex case.")
-@click.option(
-    "-v",
-    "--invert-match",
-    is_flag=True,
-    help="Inverts the regex match (not select/exclude).",
-)
+@query_options
+@regex_options
 @click.option(
     "-f",
     "--force",
@@ -74,16 +66,7 @@ def save(
 
 @query.command(help="Run saved queries")
 @click.argument("pattern", type=str, default=r".*")
-@click.option(
-    "-l", "--long", type=click.BOOL, is_flag=True, help="Long listing format."
-)
-@click.option(
-    "--relative-to",
-    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
-    default=Path("."),
-    help="Display paths relative to given directory.",
-)
-@click.option("--prefix", default="")
+@file_print_options
 @click.option(
     "-w",
     "--write",
