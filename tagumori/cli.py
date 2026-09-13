@@ -5,26 +5,11 @@ import click
 
 from tagumori import service
 from tagumori.commands import db, file, query, review, tag, tagalong
+from tagumori.commands.common import regex_options
 from tagumori.commands.context import LazyVault
 from tagumori.render import format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
-
-
-def regex_options(func):
-    func = click.option(
-        "-p", "--pattern", help="Filter output by regex pattern.", default=r".*"
-    )(func)
-    func = click.option("-i", "--ignore-case", is_flag=True, help="Ignore regex case.")(
-        func
-    )
-    func = click.option(
-        "-v",
-        "--invert-match",
-        is_flag=True,
-        help="Inverts the regex match (not select/exclude).",
-    )(func)
-    return func
 
 
 @click.group()

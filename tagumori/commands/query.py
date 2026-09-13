@@ -5,6 +5,7 @@ from random import random
 import click
 
 from tagumori import crud, service
+from tagumori.commands.common import regex_options
 from tagumori.commands.context import LazyVault
 from tagumori.models import Query
 from tagumori.render import format_file_output
@@ -21,14 +22,7 @@ def query(vault: LazyVault):
 @click.option("-s", "--select", multiple=True)
 @click.option("-e", "--exclude", multiple=True)
 @click.option("-I", "--ignore-tag-case", is_flag=True, help="Ignore tag case.")
-@click.option("-p", "--pattern", help="Filter output by regex pattern.", default=r".*")
-@click.option("-i", "--ignore-case", is_flag=True, help="Ignore regex case.")
-@click.option(
-    "-v",
-    "--invert-match",
-    is_flag=True,
-    help="Inverts the regex match (not select/exclude).",
-)
+@regex_options
 @click.option(
     "-f",
     "--force",
