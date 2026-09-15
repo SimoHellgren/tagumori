@@ -1,6 +1,6 @@
 from collections import defaultdict
 from collections.abc import Sequence
-from itertools import groupby
+from itertools import chain, groupby
 from pathlib import Path
 from sqlite3 import Connection, Row
 
@@ -9,6 +9,8 @@ from tagumori.models import File, TaggedFile
 from tagumori.query import parse_for_storage, search
 from tagumori.query.ast import And, Expr, Tag
 from tagumori.utils import compile_pattern
+
+flatten = chain.from_iterable
 
 
 # utilities for turning the db file_tag structures to AST and paths
@@ -39,22 +41,62 @@ def _db_to_ast(file_tags: Sequence[Row]) -> Expr:
     return And(roots)
 
 
+def _paths_by_id(rows: Sequence[Row]) -> dict[int, tuple[str, ...]]:
+    names = {row["id"]: row["name"] for row in rows}
+    children: dict[int | None, list[int]] = defaultdict(list)
+
+    for row in rows:
+        children[row["parent_id"]].append(row["id"])
+
+    paths: dict[int, tuple[str, ...]] = {}
+
+    def visit(node_id: int, parent_path: tuple[str, ...]) -> None:
+        path = parent_path + (names[node_id],)
+        paths[node_id] = path
+        for child_id in children[node_id]:
+            visit(child_id, path)
+
+    for root_id in children[None]:
+        visit(root_id, ())
+
+    return paths
+
+
 # TODO: could use a dedicated return type
-def _ast_to_paths(node: Expr, prefix=()) -> list[tuple[str, ...]]:
+def _ast_to_leaf_paths(node: Expr, prefix=()) -> set[tuple[str, ...]]:
+    """Takes an AST and returns a list of all paths from root to leaf.
+    e.g. a[b,c[d]] -> [(a,b), (a,c,d)]
+    """
     match node:
         case Tag(name, None):
-            return [prefix + (name,)]
+            return {prefix + (name,)}
         case Tag(name, children):
-            return _ast_to_paths(children, prefix + (name,))
+            return _ast_to_leaf_paths(children, prefix + (name,))
         case And(operands):
-            return [p for op in operands for p in _ast_to_paths(op, prefix)]
+            return {p for op in operands for p in _ast_to_leaf_paths(op, prefix)}
 
         case _:
-            return []
+            return set()
 
 
-def _db_tags_to_paths(file_tags: Sequence[Row]) -> set[tuple[str, ...]]:
-    return set(_ast_to_paths(_db_to_ast(file_tags)))
+def _ast_to_path_closure(node: Expr, prefix=()) -> set[tuple[str, ...]]:
+    """Takes an AST and returns paths from root to each child.
+    e.g. a[b,c[d]] -> {(a,), (a,b), (a,c), (a,c,d)}
+    """
+    match node:
+        case Tag(name, None):
+            return {prefix + (name,)}
+        case Tag(name, children):
+            here = prefix + (name,)
+            return {here} | _ast_to_path_closure(children, here)
+        case And(operands):
+            return set(flatten(_ast_to_path_closure(op, prefix) for op in operands))
+
+
+# TODO: consider removing
+def _db_tags_to_leaf_paths(file_tags: Sequence[Row]) -> set[tuple[str, ...]]:
+    """Leaf paths only - see _paths_by_id for every node's materialized path."""
+    return set(_ast_to_leaf_paths(_db_to_ast(file_tags)))
 
 
 def attach_tree(
@@ -97,20 +139,21 @@ def add_tags_to_files(
 def remove_tags_from_files(
     conn: Connection, files: Sequence[Path], tags: Sequence[str]
 ):
-    # non-existing files are skipped here due to how get_many_by_path works.
-    file_ids = [x.id for x in crud.file.get_many_by_path(conn, files)]
-
     tag_expr = ",".join(tags)
     node = parse_for_storage(tag_expr)
 
-    tag_paths = _ast_to_paths(node)
+    # remove only leafs
+    unwanted = set(_ast_to_leaf_paths(node))
 
-    for file_id in file_ids:
-        for tag in tags:
-            for path in tag_paths:
-                file_tag_id = crud.file_tag.resolve_path(conn, file_id, path)
-                if file_tag_id:
-                    crud.file_tag.detach(conn, file_tag_id)
+    # fetch files and their tags
+    file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
+    db_tags = crud.file_tag.get_by_file_ids(conn, file_ids)
+
+    existing_paths = _paths_by_id(db_tags)
+
+    for ft_id, path in existing_paths.items():
+        if path in unwanted:
+            crud.file_tag.detach(conn, ft_id)
 
 
 def set_tags_on_files(
@@ -122,22 +165,23 @@ def set_tags_on_files(
     tag_expr = ",".join(tags)
     node = parse_for_storage(tag_expr)
 
-    # remove unwanted paths
-    desired_paths = set(_ast_to_paths(node))
+    # get closure of tags/paths to retain
+    keep = _ast_to_path_closure(node)
 
+    # fetch files and their tags
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
-
     db_tags = crud.file_tag.get_by_file_ids(conn, file_ids)
 
-    lookup = {k: list(v) for k, v in groupby(db_tags, key=lambda x: x["file_id"])}
+    # materialized path to every node, keyed by file_tag id
+    existing_paths = _paths_by_id(db_tags)
 
-    for file_id in file_ids:
-        existing_paths = _db_tags_to_paths(lookup.get(file_id, []))
-
-        paths_to_delete = existing_paths - desired_paths
-        for path in paths_to_delete:
-            file_tag_id = crud.file_tag.resolve_path(conn, file_id, path)
-            crud.file_tag.detach(conn, file_tag_id)
+    for ft_id, path in existing_paths.items():
+        # removes a filetag if it is not in the "keep" list AND
+        # - it is a root (cascades) OR
+        # - its parent shall be kept, i.e. this is the topmost
+        #   node to delete in its branch
+        if path not in keep and (len(path) == 1 or path[:-1] in keep):
+            crud.file_tag.detach(conn, ft_id)
 
     # attach new tags - done after removal so new tagalongs aren't nuked.
     # add_tags_to_files evaluates ´tags´ as well, so there's a bit of double work here.

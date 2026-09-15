@@ -1,36 +1,6 @@
 from sqlite3 import Connection, Row
 
 
-def resolve_path(conn: Connection, file_id: int, path: tuple[str, ...]) -> int | None:
-    """Finds the lowest node of a path and returns file_tag.id if said path exists for file."""
-    # TODO: this could probably be implemented as a special case of find_all, or at
-    # least utilize similar recursive logic.
-    parent_id = None
-    for tag in path:
-        row = conn.execute(
-            """
-            SELECT file_tag.id
-            FROM file_tag
-            JOIN tag on file_tag.tag_id = tag.id
-            WHERE file_tag.file_id = ?
-            AND tag.name = ?
-            AND (
-                file_tag.parent_id = ?
-                OR (file_tag.parent_id IS NULL AND ? IS NULL)
-            )
-                    
-        """,
-            (file_id, tag, parent_id, parent_id),
-        ).fetchone()
-
-        if not row:
-            return None
-
-        parent_id = row["id"]
-
-    return parent_id
-
-
 def get_by_file_ids(conn: Connection, file_ids: list[int]) -> list[Row]:
     if not file_ids:
         return []
