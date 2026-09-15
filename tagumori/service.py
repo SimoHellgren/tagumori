@@ -138,20 +138,21 @@ def add_tags_to_files(
 def remove_tags_from_files(
     conn: Connection, files: Sequence[Path], tags: Sequence[str]
 ):
-    # non-existing files are skipped here due to how get_many_by_path works.
-    file_ids = [x.id for x in crud.file.get_many_by_path(conn, files)]
-
     tag_expr = ",".join(tags)
     node = parse_for_storage(tag_expr)
 
-    tag_paths = _ast_to_paths(node)
+    # use _ast_to_paths to get root-leaf paths
+    unwanted = set(_ast_to_paths(node))
 
-    for file_id in file_ids:
-        for tag in tags:
-            for path in tag_paths:
-                file_tag_id = crud.file_tag.resolve_path(conn, file_id, path)
-                if file_tag_id:
-                    crud.file_tag.detach(conn, file_tag_id)
+    # fetch files and their tags
+    file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
+    db_tags = crud.file_tag.get_by_file_ids(conn, file_ids)
+
+    existing_paths = _paths_by_id(db_tags)
+
+    for ft_id, path in existing_paths.items():
+        if path in unwanted:
+            crud.file_tag.detach(conn, ft_id)
 
 
 def set_tags_on_files(
@@ -167,9 +168,7 @@ def set_tags_on_files(
     keep = _ast_to_closure(node)
 
     # fetch files and their tags
-    db_files = crud.file.get_or_create_many(conn, files)
-    file_ids = [x.id for x in db_files]
-
+    file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
     db_tags = crud.file_tag.get_by_file_ids(conn, file_ids)
 
     # materialized path to every node, keyed by file_tag id
