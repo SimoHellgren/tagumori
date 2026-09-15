@@ -63,6 +63,7 @@ class ReviewSession:
             service.add_tags_to_files(conn, [self.current], [expr])
 
         # TODO: should probably make _ast_to_paths a public method
+        # TODO: paths is also a bit overkill - could just recurse to get unique tags
         new_tags = {*flatten(service._ast_to_paths(node))}
         self.known_tags |= new_tags
 

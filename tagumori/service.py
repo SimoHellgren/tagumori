@@ -63,20 +63,20 @@ def _paths_by_id(rows: Sequence[Row]) -> dict[int, tuple[str, ...]]:
 
 
 # TODO: could use a dedicated return type
-def _ast_to_paths(node: Expr, prefix=()) -> list[tuple[str, ...]]:
+def _ast_to_paths(node: Expr, prefix=()) -> set[tuple[str, ...]]:
     """Takes an AST and returns a list of all paths from root to leaf.
     e.g. a[b,c[d]] -> [(a,b), (a,c,d)]
     """
     match node:
         case Tag(name, None):
-            return [prefix + (name,)]
+            return {prefix + (name,)}
         case Tag(name, children):
             return _ast_to_paths(children, prefix + (name,))
         case And(operands):
-            return [p for op in operands for p in _ast_to_paths(op, prefix)]
+            return {p for op in operands for p in _ast_to_paths(op, prefix)}
 
         case _:
-            return []
+            return set()
 
 
 def _ast_to_closure(node: Expr, prefix=()) -> set[tuple[str, ...]]:
