@@ -63,7 +63,7 @@ def _paths_by_id(rows: Sequence[Row]) -> dict[int, tuple[str, ...]]:
 
 
 # TODO: could use a dedicated return type
-def _ast_to_paths(node: Expr, prefix=()) -> set[tuple[str, ...]]:
+def _ast_to_leaf_paths(node: Expr, prefix=()) -> set[tuple[str, ...]]:
     """Takes an AST and returns a list of all paths from root to leaf.
     e.g. a[b,c[d]] -> [(a,b), (a,c,d)]
     """
@@ -71,15 +71,15 @@ def _ast_to_paths(node: Expr, prefix=()) -> set[tuple[str, ...]]:
         case Tag(name, None):
             return {prefix + (name,)}
         case Tag(name, children):
-            return _ast_to_paths(children, prefix + (name,))
+            return _ast_to_leaf_paths(children, prefix + (name,))
         case And(operands):
-            return {p for op in operands for p in _ast_to_paths(op, prefix)}
+            return {p for op in operands for p in _ast_to_leaf_paths(op, prefix)}
 
         case _:
             return set()
 
 
-def _ast_to_closure(node: Expr, prefix=()) -> set[tuple[str, ...]]:
+def _ast_to_path_closure(node: Expr, prefix=()) -> set[tuple[str, ...]]:
     """Takes an AST and returns paths from root to each child.
     e.g. a[b,c[d]] -> {(a,), (a,b), (a,c), (a,c,d)}
     """
@@ -88,14 +88,15 @@ def _ast_to_closure(node: Expr, prefix=()) -> set[tuple[str, ...]]:
             return {prefix + (name,)}
         case Tag(name, children):
             here = prefix + (name,)
-            return {here} | _ast_to_closure(children, here)
+            return {here} | _ast_to_path_closure(children, here)
         case And(operands):
-            return set(flatten(_ast_to_closure(op, prefix) for op in operands))
+            return set(flatten(_ast_to_path_closure(op, prefix) for op in operands))
 
 
-def _db_tags_to_paths(file_tags: Sequence[Row]) -> set[tuple[str, ...]]:
+# TODO: consider removing
+def _db_tags_to_leaf_paths(file_tags: Sequence[Row]) -> set[tuple[str, ...]]:
     """Leaf paths only - see _paths_by_id for every node's materialized path."""
-    return set(_ast_to_paths(_db_to_ast(file_tags)))
+    return set(_ast_to_leaf_paths(_db_to_ast(file_tags)))
 
 
 def attach_tree(
@@ -141,8 +142,8 @@ def remove_tags_from_files(
     tag_expr = ",".join(tags)
     node = parse_for_storage(tag_expr)
 
-    # use _ast_to_paths to get root-leaf paths
-    unwanted = set(_ast_to_paths(node))
+    # remove only leafs
+    unwanted = set(_ast_to_leaf_paths(node))
 
     # fetch files and their tags
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
@@ -165,7 +166,7 @@ def set_tags_on_files(
     node = parse_for_storage(tag_expr)
 
     # get closure of tags/paths to retain
-    keep = _ast_to_closure(node)
+    keep = _ast_to_path_closure(node)
 
     # fetch files and their tags
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
