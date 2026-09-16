@@ -391,7 +391,7 @@ class TestReviewCommand:
         assert result.exit_code == 0
         assert prompts.seen[0].startswith(f"1/{len(sample_files)} ")
 
-    def test_runs_a_scripted_session(self, invoke, vault, sample_files, prompts):
+    def test_runs_a_scripted_session(self, invoke, lazy_vault, sample_files, prompts):
         listing = sample_files[0].parent / "list.txt"
         listing.write_text("\n".join(str(f) for f in sample_files))
         prompts.script("add", "rock", "exit")
@@ -400,8 +400,7 @@ class TestReviewCommand:
 
         assert result.exit_code == 0
 
-        conn = LazyVault(vault, click.Context(click.Command("test")))
-        with conn as c:
+        with lazy_vault as c:
             file = crud.file.get_by_path(c, sample_files[0])
             assert file is not None
             tagged = service.lookup_tags(c, [file])
