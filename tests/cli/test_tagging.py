@@ -1,3 +1,5 @@
+import pytest
+
 from tagumori.cli import cli
 
 
@@ -140,7 +142,16 @@ class TestLs:
         assert tagged_file.name in result.output
         assert "rock" in result.output
 
-    def test_ls_select_filter(self, invoke, tmp_path):
+    @pytest.mark.parametrize(
+        "flag, expected_present, expected_absent",
+        [
+            pytest.param("-s", "rock.txt", "jazz.txt", id="select"),
+            pytest.param("-e", "jazz.txt", "rock.txt", id="exclude"),
+        ],
+    )
+    def test_ls_select_and_exclude_filter(
+        self, invoke, tmp_path, flag, expected_present, expected_absent
+    ):
         file1 = tmp_path / "rock.txt"
         file2 = tmp_path / "jazz.txt"
         file1.write_text("")
@@ -149,26 +160,11 @@ class TestLs:
         invoke("add", "-f", str(file1), "-t", "rock")
         invoke("add", "-f", str(file2), "-t", "jazz")
 
-        result = invoke("ls", "-s", "rock")
+        result = invoke("ls", flag, "rock")
 
         assert result.exit_code == 0
-        assert "rock.txt" in result.output
-        assert "jazz.txt" not in result.output
-
-    def test_ls_exclude_filter(self, invoke, tmp_path):
-        file1 = tmp_path / "rock.txt"
-        file2 = tmp_path / "jazz.txt"
-        file1.write_text("")
-        file2.write_text("")
-
-        invoke("add", "-f", str(file1), "-t", "rock")
-        invoke("add", "-f", str(file2), "-t", "jazz")
-
-        result = invoke("ls", "-e", "rock")
-
-        assert result.exit_code == 0
-        assert "rock.txt" not in result.output
-        assert "jazz.txt" in result.output
+        assert expected_present in result.output
+        assert expected_absent not in result.output
 
     def test_ls_pattern_filter(self, invoke, tmp_path):
         file1 = tmp_path / "song.mp3"

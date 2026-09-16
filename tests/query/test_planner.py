@@ -74,27 +74,19 @@ class TestToQueryPlanNull:
 
 
 class TestToQueryPlanOperators:
-    def test_and(self):
-        result = to_query_plan(And([Tag("a"), Tag("b")]))
-        assert result == QP_And(
-            [TagPath([SegmentTag("a")]), TagPath([SegmentTag("b")])]
-        )
-
-    def test_or(self):
-        result = to_query_plan(Or([Tag("a"), Tag("b")]))
-        assert result == QP_Or([TagPath([SegmentTag("a")]), TagPath([SegmentTag("b")])])
-
-    def test_xor(self):
-        result = to_query_plan(Xor([Tag("a"), Tag("b")]))
-        assert result == QP_Xor(
-            [TagPath([SegmentTag("a")]), TagPath([SegmentTag("b")])]
-        )
-
-    def test_only_one(self):
-        result = to_query_plan(OnlyOne([Tag("a"), Tag("b")]))
-        assert result == QP_OnlyOne(
-            [TagPath([SegmentTag("a")]), TagPath([SegmentTag("b")])]
-        )
+    @pytest.mark.parametrize(
+        "ast_cls, qp_cls",
+        [
+            pytest.param(And, QP_And, id="and"),
+            pytest.param(Or, QP_Or, id="or"),
+            pytest.param(Xor, QP_Xor, id="xor"),
+            pytest.param(OnlyOne, QP_OnlyOne, id="only_one"),
+        ],
+    )
+    def test_binary_operator(self, ast_cls, qp_cls):
+        result = to_query_plan(ast_cls([Tag("a"), Tag("b")]))
+        expected = qp_cls([TagPath([SegmentTag("a")]), TagPath([SegmentTag("b")])])
+        assert result == expected
 
     def test_not_at_top_level(self):
         result = to_query_plan(Not(Tag("a")))
@@ -129,13 +121,14 @@ class TestToQueryPlanNotInBrackets:
 
 
 class TestToQueryPlanNotImplemented:
-    def test_wildcard_path_raises(self):
+    @pytest.mark.parametrize(
+        "node",
+        [WildcardPath(), WildcardBounded(3)],
+        ids=["wildcard_path", "wildcard_bounded"],
+    )
+    def test_raises(self, node):
         with pytest.raises(NotImplementedError):
-            to_query_plan(WildcardPath())
-
-    def test_wildcard_bounded_raises(self):
-        with pytest.raises(NotImplementedError):
-            to_query_plan(WildcardBounded(3))
+            to_query_plan(node)
 
 
 # helpers for simplify tests
@@ -155,17 +148,13 @@ class TestSimplify:
     def test_flatten_nested_or(self):
         assert simplify(QP_Or([QP_Or([a, b]), c])) == QP_Or([a, b, c])
 
-    def test_unwrap_single_and(self):
-        assert simplify(QP_And([a])) == a
-
-    def test_unwrap_single_or(self):
-        assert simplify(QP_Or([a])) == a
-
-    def test_unwrap_single_xor(self):
-        assert simplify(QP_Xor([a])) == a
-
-    def test_unwrap_single_only_one(self):
-        assert simplify(QP_OnlyOne([a])) == a
+    @pytest.mark.parametrize(
+        "qp_cls",
+        [QP_And, QP_Or, QP_Xor, QP_OnlyOne],
+        ids=["and", "or", "xor", "only_one"],
+    )
+    def test_unwrap_single(self, qp_cls):
+        assert simplify(qp_cls([a])) == a
 
     def test_double_negation(self):
         assert simplify(QP_Not(QP_Not(a))) == a
