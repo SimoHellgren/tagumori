@@ -467,59 +467,34 @@ class TestTagalong:
         tag_names = {r["name"] for r in rows}
         assert tag_names == {"A", "B", "C"}
 
-    def test_circular_tagalong_two_nodes(self, conn):
-        """A -> B -> A should not loop infinitely."""
-        a = crud.tag.create(conn, "A")
-        b = crud.tag.create(conn, "B")
-
-        crud.tagalong.create(conn, a.id, b.id)
-        crud.tagalong.create(conn, b.id, a.id)
+    @pytest.mark.parametrize(
+        "names, edges",
+        [
+            pytest.param(["A", "B"], [("A", "B"), ("B", "A")], id="two_node_cycle"),
+            pytest.param(
+                ["A", "B", "C"],
+                [("A", "B"), ("B", "C"), ("C", "A")],
+                id="three_node_cycle",
+            ),
+            pytest.param(["A"], [("A", "A")], id="self_referential"),
+        ],
+    )
+    def test_circular_tagalong_terminates(self, conn, names, edges):
+        """A cycle in the tagalong graph must not cause apply() to loop
+        infinitely, and should still resolve to every tag in the cycle."""
+        tags = {name: crud.tag.create(conn, name) for name in names}
+        for source, target in edges:
+            crud.tagalong.create(conn, tags[source].id, tags[target].id)
 
         file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        crud.file_tag.attach(conn, file_row.id, a.id)
+        crud.file_tag.attach(conn, file_row.id, tags[names[0]].id)
 
         # Should complete without hanging
         crud.tagalong.apply(conn, [file_row.id])
 
         rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
         tag_names = {r["name"] for r in rows}
-        assert tag_names == {"A", "B"}
-
-    def test_circular_tagalong_three_nodes(self, conn):
-        """A -> B -> C -> A should not loop infinitely."""
-        a = crud.tag.create(conn, "A")
-        b = crud.tag.create(conn, "B")
-        c = crud.tag.create(conn, "C")
-
-        crud.tagalong.create(conn, a.id, b.id)
-        crud.tagalong.create(conn, b.id, c.id)
-        crud.tagalong.create(conn, c.id, a.id)
-
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        crud.file_tag.attach(conn, file_row.id, a.id)
-
-        # Should complete without hanging
-        crud.tagalong.apply(conn, [file_row.id])
-
-        rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        tag_names = {r["name"] for r in rows}
-        assert tag_names == {"A", "B", "C"}
-
-    def test_self_referential_tagalong(self, conn):
-        """A -> A should not cause issues."""
-        a = crud.tag.create(conn, "A")
-
-        crud.tagalong.create(conn, a.id, a.id)
-
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        crud.file_tag.attach(conn, file_row.id, a.id)
-
-        # Should complete without hanging
-        crud.tagalong.apply(conn, [file_row.id])
-
-        rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        tag_names = {r["name"] for r in rows}
-        assert tag_names == {"A"}
+        assert tag_names == set(names)
 
 
 class TestCascadeDeletes:
