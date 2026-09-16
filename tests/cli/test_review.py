@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import click
 import pytest
 from prompt_toolkit.document import Document
@@ -55,6 +53,7 @@ def prompts(monkeypatch) -> ScriptedPrompts:
             return scripted.answers.pop(0)
 
     monkeypatch.setattr(review_module, "PromptSession", StubPromptSession)
+    monkeypatch.setattr(review_module, "_stdio_has_tty", lambda: True)
     return scripted
 
 
@@ -159,7 +158,9 @@ class TestAddTags:
 
         assert "jazz" in str(tagged[0].tags)
 
-    def test_nested_expression_is_stored_as_a_tree(self, session, lazy_vault, sample_files):
+    def test_nested_expression_is_stored_as_a_tree(
+        self, session, lazy_vault, sample_files
+    ):
         session.add_tags("artist[Led Zeppelin]")
 
         with lazy_vault as conn:

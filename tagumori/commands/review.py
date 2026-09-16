@@ -1,4 +1,5 @@
 import cmd
+import sys
 from itertools import chain
 from pathlib import Path
 from typing import TextIO
@@ -7,6 +8,7 @@ import click
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion, WordCompleter
 from prompt_toolkit.document import Document
+from prompt_toolkit.input.defaults import create_input
 
 from tagumori import crud, service
 from tagumori.commands.context import LazyVault
@@ -96,18 +98,25 @@ class TagCompleter(Completer):
             yield Completion(tag, start_position=-len(partial))
 
 
+def _stdio_has_tty() -> bool:
+    """True if a human could plausibly be typing at stdin, stdout, or stderr."""
+    return any(s.isatty() for s in (sys.stdin, sys.stdout, sys.stderr))
+
+
 class REPL(cmd.Cmd):
     prompt = "> "
 
     def __init__(self, session: ReviewSession):
         self.session = session
 
+        shared_input = create_input(always_prefer_tty=True)
+
         # session & completer for tags
-        self.tag_session: PromptSession = PromptSession()
+        self.tag_session: PromptSession = PromptSession(input=shared_input)
         self.tag_completer = TagCompleter(session.known_tags)
 
         # session & completer for commands
-        self.cmd_session: PromptSession = PromptSession()
+        self.cmd_session: PromptSession = PromptSession(input=shared_input)
         commands = [
             k.removeprefix("do_")
             for k in vars(REPL)
@@ -186,7 +195,10 @@ def review(vault: LazyVault, file: TextIO):
         click.echo("Input file is empty.")
         return
 
-    # TODO: still bug when reading from stdin
+    if not _stdio_has_tty():
+        raise click.ClickException(
+            "review needs an interactive terminal; none of stdin/stdout/stderr is one."
+        )
 
     session = ReviewSession(vault, lines)
 
