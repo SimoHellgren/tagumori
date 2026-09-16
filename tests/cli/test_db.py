@@ -28,43 +28,39 @@ class TestInit:
 
 
 class TestBackup:
-    def test_backup_creates_file(self, runner, vault, tmp_path):
+    def test_backup_creates_file(self, invoke, tmp_path):
         backup_path = tmp_path / "backup.db"
 
-        result = runner.invoke(
-            cli, ["--vault", str(vault), "db", "backup", str(backup_path)]
-        )
+        result = invoke("db", "backup", str(backup_path))
 
         assert result.exit_code == 0
         assert backup_path.exists()
         assert "Backup created" in result.output
 
-    def test_backup_default_filename(self, runner, vault, tmp_path):
+    def test_backup_default_filename(self, invoke, runner, tmp_path):
         with runner.isolated_filesystem(temp_dir=tmp_path):
-            result = runner.invoke(cli, ["--vault", str(vault), "db", "backup"])
+            result = invoke("db", "backup")
 
             assert result.exit_code == 0
             # Should create file with timestamp pattern
             backup_files = list(Path(".").glob("test_vault-*.db"))
             assert len(backup_files) == 1
 
-    def test_backup_with_directory(self, runner, vault, tmp_path):
+    def test_backup_with_directory(self, invoke, tmp_path):
         backup_dir = tmp_path / "backups"
         backup_dir.mkdir()
 
-        result = runner.invoke(
-            cli, ["--vault", str(vault), "db", "backup", "-d", str(backup_dir)]
-        )
+        result = invoke("db", "backup", "-d", str(backup_dir))
 
         assert result.exit_code == 0
         backup_files = list(backup_dir.glob("test_vault-*.db"))
         assert len(backup_files) == 1
 
-    def test_backup_is_valid_sqlite(self, runner, vault, tmp_path, tagged_file):
+    def test_backup_is_valid_sqlite(self, invoke, tmp_path, tagged_file):
         import sqlite3
 
         backup_path = tmp_path / "backup.db"
-        runner.invoke(cli, ["--vault", str(vault), "db", "backup", str(backup_path)])
+        invoke("db", "backup", str(backup_path))
 
         # Verify backup is valid and contains data
         conn = sqlite3.connect(backup_path)
@@ -73,46 +69,42 @@ class TestBackup:
 
         assert count == 1
 
-    def test_backup_existing_prompts(self, runner, vault, tmp_path):
+    def test_backup_existing_prompts(self, invoke, tmp_path):
         backup_path = tmp_path / "backup.db"
         backup_path.write_text("existing")
 
         # Say no to overwrite
-        result = runner.invoke(
-            cli, ["--vault", str(vault), "db", "backup", str(backup_path)], input="n\n"
-        )
+        result = invoke("db", "backup", str(backup_path), input="n\n")
 
         assert result.exit_code != 0  # Aborted
 
-    def test_backup_existing_overwrite(self, runner, vault, tmp_path):
+    def test_backup_existing_overwrite(self, invoke, tmp_path):
         backup_path = tmp_path / "backup.db"
         backup_path.write_text("existing")
 
         # Say yes to overwrite
-        result = runner.invoke(
-            cli, ["--vault", str(vault), "db", "backup", str(backup_path)], input="y\n"
-        )
+        result = invoke("db", "backup", str(backup_path), input="y\n")
 
         assert result.exit_code == 0
         assert backup_path.stat().st_size > len("existing")  # Now it's a real db
 
 
 class TestMigrate:
-    def test_migrate_runs_successfully(self, runner, vault):
-        result = runner.invoke(cli, ["--vault", str(vault), "db", "migrate"])
+    def test_migrate_runs_successfully(self, invoke):
+        result = invoke("db", "migrate")
 
         assert result.exit_code == 0
         assert "Schema updated" in result.output
 
-    def test_migrate_is_idempotent(self, runner, vault):
+    def test_migrate_is_idempotent(self, invoke):
         # Run migrate twice - should succeed both times
-        result1 = runner.invoke(cli, ["--vault", str(vault), "db", "migrate"])
-        result2 = runner.invoke(cli, ["--vault", str(vault), "db", "migrate"])
+        result1 = invoke("db", "migrate")
+        result2 = invoke("db", "migrate")
 
         assert result1.exit_code == 0
         assert result2.exit_code == 0
 
-    def test_migrate_preserves_existing_data(self, runner, vault, tagged_file):
+    def test_migrate_preserves_existing_data(self, invoke, vault, tagged_file):
         import sqlite3
 
         # Verify data exists before migration
@@ -121,7 +113,7 @@ class TestMigrate:
         conn.close()
 
         # Run migration
-        result = runner.invoke(cli, ["--vault", str(vault), "db", "migrate"])
+        result = invoke("db", "migrate")
         assert result.exit_code == 0
 
         # Verify data still exists after migration
@@ -131,10 +123,10 @@ class TestMigrate:
 
         assert count_before == count_after == 1
 
-    def test_migrate_creates_query_table(self, runner, vault):
+    def test_migrate_creates_query_table(self, invoke, vault):
         import sqlite3
 
-        runner.invoke(cli, ["--vault", str(vault), "db", "migrate"])
+        invoke("db", "migrate")
 
         conn = sqlite3.connect(vault)
         tables = conn.execute(
@@ -146,8 +138,8 @@ class TestMigrate:
 
 
 class TestInfo:
-    def test_info_shows_basic_fields(self, runner, vault):
-        result = runner.invoke(cli, ["--vault", str(vault), "db", "info"])
+    def test_info_shows_basic_fields(self, invoke):
+        result = invoke("db", "info")
 
         assert result.exit_code == 0
         assert "SQLite version:" in result.output
@@ -157,8 +149,8 @@ class TestInfo:
         assert "Modified:" in result.output
         assert "Tables:" in result.output
 
-    def test_info_shows_table_counts(self, runner, vault, tagged_file):
-        result = runner.invoke(cli, ["--vault", str(vault), "db", "info"])
+    def test_info_shows_table_counts(self, invoke, tagged_file):
+        result = invoke("db", "info")
 
         assert result.exit_code == 0
         assert "file:" in result.output

@@ -5,7 +5,6 @@ import pytest
 from prompt_toolkit.document import Document
 
 from tagumori import crud, service
-from tagumori.cli import cli
 from tagumori.commands import review as review_module
 from tagumori.commands.context import LazyVault
 from tagumori.commands.review import REPL, ReviewSession, TagCompleter
@@ -359,53 +358,45 @@ class TestREPL:
 
 
 class TestReviewCommand:
-    def test_empty_input_file_is_reported(self, runner, vault, tmp_path):
+    def test_empty_input_file_is_reported(self, invoke, tmp_path):
         listing = tmp_path / "empty.txt"
         listing.write_text("")
 
-        result = runner.invoke(
-            cli, ["--vault", str(vault), "review", str(listing)]
-        )
+        result = invoke("review", str(listing))
 
         assert result.exit_code == 0
         assert "empty" in result.output
 
-    def test_blank_lines_only_is_treated_as_empty(self, runner, vault, tmp_path):
+    def test_blank_lines_only_is_treated_as_empty(self, invoke, tmp_path):
         listing = tmp_path / "blank.txt"
         listing.write_text("\n   \n\n")
 
-        result = runner.invoke(
-            cli, ["--vault", str(vault), "review", str(listing)]
-        )
+        result = invoke("review", str(listing))
 
         assert result.exit_code == 0
         assert "empty" in result.output
 
-    def test_missing_input_file_fails(self, runner, vault, tmp_path):
-        result = runner.invoke(
-            cli, ["--vault", str(vault), "review", str(tmp_path / "nope.txt")]
-        )
+    def test_missing_input_file_fails(self, invoke, tmp_path):
+        result = invoke("review", str(tmp_path / "nope.txt"))
 
         assert result.exit_code != 0
 
-    def test_blank_lines_are_skipped(self, runner, vault, sample_files, prompts):
+    def test_blank_lines_are_skipped(self, invoke, sample_files, prompts):
         """A trailing newline must not become Path('.') and pad the list."""
         listing = sample_files[0].parent / "list.txt"
         listing.write_text("\n".join(str(f) for f in sample_files) + "\n\n")
 
-        result = runner.invoke(cli, ["--vault", str(vault), "review", str(listing)])
+        result = invoke("review", str(listing))
 
         assert result.exit_code == 0
         assert prompts.seen[0].startswith(f"1/{len(sample_files)} ")
 
-    def test_runs_a_scripted_session(self, runner, vault, sample_files, prompts):
+    def test_runs_a_scripted_session(self, invoke, vault, sample_files, prompts):
         listing = sample_files[0].parent / "list.txt"
         listing.write_text("\n".join(str(f) for f in sample_files))
         prompts.script("add", "rock", "exit")
 
-        result = runner.invoke(
-            cli, ["--vault", str(vault), "review", str(listing)]
-        )
+        result = invoke("review", str(listing))
 
         assert result.exit_code == 0
 

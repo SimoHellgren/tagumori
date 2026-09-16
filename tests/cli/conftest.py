@@ -1,7 +1,8 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 
 from tagumori.cli import cli
 
@@ -21,6 +22,16 @@ def vault(tmp_path) -> Path:
 
 
 @pytest.fixture
+def invoke(runner: CliRunner, vault: Path) -> Callable[..., Result]:
+    """Invokes the CLI against the temp vault, without repeating --vault."""
+
+    def _invoke(*args: str, input: str | None = None) -> Result:
+        return runner.invoke(cli, ["--vault", str(vault), *args], input=input)
+
+    return _invoke
+
+
+@pytest.fixture
 def sample_file(tmp_path) -> Path:
     """Creates a temporary file to tag."""
     file_path = tmp_path / "sample.txt"
@@ -29,11 +40,9 @@ def sample_file(tmp_path) -> Path:
 
 
 @pytest.fixture
-def tagged_file(runner, vault, sample_file) -> Path:
+def tagged_file(invoke, sample_file) -> Path:
     """A sample file already tagged with 'rock'."""
-    runner.invoke(
-        cli, ["--vault", str(vault), "add", "-f", str(sample_file), "-t", "rock"]
-    )
+    invoke("add", "-f", str(sample_file), "-t", "rock")
     return sample_file
 
 
