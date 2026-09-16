@@ -537,58 +537,39 @@ class TestCascadeDeletes:
         rows = crud.tagalong.get_all_names(conn)
         assert rows == []
 
-    def test_delete_parent_file_tag_cascades_to_children(self, conn):
-        """Deleting a parent file_tag should delete its children."""
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        parent_tag = crud.tag.create(conn, "genre")
-        child_tag = crud.tag.create(conn, "rock")
-        grandchild_tag = crud.tag.create(conn, "classic")
+    @pytest.mark.parametrize(
+        "tag_names, detach_name, expected_remaining",
+        [
+            pytest.param(
+                ("genre", "rock", "classic"),
+                "genre",
+                [],
+                id="delete_parent_cascades_to_children_and_grandchildren",
+            ),
+            pytest.param(
+                ("genre", "rock"),
+                "rock",
+                ["genre"],
+                id="delete_child_preserves_parent",
+            ),
+            pytest.param(
+                ("genre", "rock", "classic"),
+                "rock",
+                ["genre"],
+                id="delete_child_cascades_to_grandchildren_preserves_parent",
+            ),
+        ],
+    )
+    def test_detach_cascades_down_the_tree(
+        self, conn, make_tagged_file, tag_names, detach_name, expected_remaining
+    ):
+        """Detaching a file_tag should cascade to its descendants, while
+        leaving its ancestors (and siblings) untouched."""
+        fid = make_tagged_file("test.txt", [tag_names])
+        rows = crud.file_tag.get_by_file_ids(conn, [fid])
+        ft_id_by_name = {r["name"]: r["id"] for r in rows}
 
-        parent_ft_id = crud.file_tag.attach(conn, file_row.id, parent_tag.id)
-        child_ft_id = crud.file_tag.attach(
-            conn, file_row.id, child_tag.id, parent_ft_id
-        )
-        crud.file_tag.attach(conn, file_row.id, grandchild_tag.id, child_ft_id)
+        crud.file_tag.detach(conn, ft_id_by_name[detach_name])
 
-        # Delete parent - should cascade to child and grandchild
-        crud.file_tag.detach(conn, parent_ft_id)
-
-        rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        assert rows == []
-
-    def test_delete_child_file_tag_preserves_parent(self, conn):
-        """Deleting a child file_tag should preserve the parent."""
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        parent_tag = crud.tag.create(conn, "genre")
-        child_tag = crud.tag.create(conn, "rock")
-
-        parent_ft_id = crud.file_tag.attach(conn, file_row.id, parent_tag.id)
-        child_ft_id = crud.file_tag.attach(
-            conn, file_row.id, child_tag.id, parent_ft_id
-        )
-
-        crud.file_tag.detach(conn, child_ft_id)
-
-        rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        assert len(rows) == 1
-        assert rows[0]["name"] == "genre"
-
-    def test_delete_child_file_tag_cascades_to_grandchildren(self, conn):
-        """Deleting a child file_tag should delete its children but preserve parent."""
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        parent_tag = crud.tag.create(conn, "genre")
-        child_tag = crud.tag.create(conn, "rock")
-        grandchild_tag = crud.tag.create(conn, "classic")
-
-        parent_ft_id = crud.file_tag.attach(conn, file_row.id, parent_tag.id)
-        child_ft_id = crud.file_tag.attach(
-            conn, file_row.id, child_tag.id, parent_ft_id
-        )
-        crud.file_tag.attach(conn, file_row.id, grandchild_tag.id, child_ft_id)
-
-        # Delete child - should cascade to grandchild but preserve parent
-        crud.file_tag.detach(conn, child_ft_id)
-
-        rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        assert len(rows) == 1
-        assert rows[0]["name"] == "genre"
+        remaining = crud.file_tag.get_by_file_ids(conn, [fid])
+        assert [r["name"] for r in remaining] == expected_remaining
