@@ -276,9 +276,9 @@ class TestFileCRUD:
 
 class TestFileTag:
     @pytest.fixture
-    def file_and_tag(self, conn):
+    def file_and_tag(self, conn, make_tag):
         file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        tag_row = crud.tag.create(conn, "rock")
+        tag_row = make_tag()
         return file_row.id, tag_row.id
 
     def test_attach(self, conn, file_and_tag):
@@ -324,70 +324,55 @@ class TestFileTag:
         assert len(rows) == 1
         assert rows[0]["name"] == "rock"
 
-    def test_get_by_file_ids_multiple_files(self, conn):
-        file1 = crud.file.get_or_create(conn, Path("a.txt"))
-        file2 = crud.file.get_or_create(conn, Path("b.txt"))
-        rock = crud.tag.create(conn, "rock")
-        jazz = crud.tag.create(conn, "jazz")
-        crud.file_tag.attach(conn, file1.id, rock.id)
-        crud.file_tag.attach(conn, file2.id, jazz.id)
+    def test_get_by_file_ids_multiple_files(self, conn, make_tagged_file):
+        file1_id = make_tagged_file("a.txt", [("rock",)])
+        file2_id = make_tagged_file("b.txt", [("jazz",)])
 
-        rows = crud.file_tag.get_by_file_ids(conn, [file1.id, file2.id])
+        rows = crud.file_tag.get_by_file_ids(conn, [file1_id, file2_id])
 
         assert len(rows) == 2
         names = {row["name"] for row in rows}
         assert names == {"rock", "jazz"}
 
-    def test_get_by_file_ids_results_include_file_id(self, conn):
-        file1 = crud.file.get_or_create(conn, Path("a.txt"))
-        file2 = crud.file.get_or_create(conn, Path("b.txt"))
-        rock = crud.tag.create(conn, "rock")
-        crud.file_tag.attach(conn, file1.id, rock.id)
-        crud.file_tag.attach(conn, file2.id, rock.id)
+    def test_get_by_file_ids_results_include_file_id(self, conn, make_tagged_file):
+        file1_id = make_tagged_file("a.txt", [("rock",)])
+        file2_id = make_tagged_file("b.txt", [("rock",)])
 
-        rows = crud.file_tag.get_by_file_ids(conn, [file1.id, file2.id])
+        rows = crud.file_tag.get_by_file_ids(conn, [file1_id, file2_id])
 
         returned_file_ids = {row["file_id"] for row in rows}
-        assert returned_file_ids == {file1.id, file2.id}
+        assert returned_file_ids == {file1_id, file2_id}
 
-    def test_get_by_file_ids_ordered_by_file_id_parent_id_name(self, conn):
-        file1 = crud.file.get_or_create(conn, Path("a.txt"))
-        file2 = crud.file.get_or_create(conn, Path("b.txt"))
-        rock = crud.tag.create(conn, "rock")
-        jazz = crud.tag.create(conn, "jazz")
-        blues = crud.tag.create(conn, "blues")
-        # file2 gets jazz and blues, file1 gets rock
-        crud.file_tag.attach(conn, file2.id, jazz.id)
-        crud.file_tag.attach(conn, file2.id, blues.id)
-        crud.file_tag.attach(conn, file1.id, rock.id)
+    def test_get_by_file_ids_ordered_by_file_id_parent_id_name(
+        self, conn, make_tagged_file
+    ):
+        # Create file1 first so it gets the lower file_id, but attach file2's
+        # tags first - proves ordering is by file_id, not attachment order.
+        file1_id = crud.file.get_or_create(conn, Path("a.txt")).id
+        file2_id = make_tagged_file("b.txt", [("jazz",), ("blues",)])
+        make_tagged_file("a.txt", [("rock",)])
 
-        rows = crud.file_tag.get_by_file_ids(conn, [file1.id, file2.id])
+        rows = crud.file_tag.get_by_file_ids(conn, [file1_id, file2_id])
 
         # file1 results should come before file2 (ordered by file_id)
-        assert rows[0]["file_id"] == file1.id
+        assert rows[0]["file_id"] == file1_id
         # file2's tags should be alphabetical (ordered by name within same parent_id)
-        file2_names = [r["name"] for r in rows if r["file_id"] == file2.id]
+        file2_names = [r["name"] for r in rows if r["file_id"] == file2_id]
         assert file2_names == ["blues", "jazz"]
 
-    def test_get_by_file_ids_skips_untagged_files(self, conn):
-        tagged = crud.file.get_or_create(conn, Path("tagged.txt"))
-        untagged = crud.file.get_or_create(conn, Path("untagged.txt"))
-        rock = crud.tag.create(conn, "rock")
-        crud.file_tag.attach(conn, tagged.id, rock.id)
+    def test_get_by_file_ids_skips_untagged_files(self, conn, make_tagged_file):
+        tagged_id = make_tagged_file("tagged.txt", [("rock",)])
+        untagged_id = crud.file.get_or_create(conn, Path("untagged.txt")).id
 
-        rows = crud.file_tag.get_by_file_ids(conn, [tagged.id, untagged.id])
+        rows = crud.file_tag.get_by_file_ids(conn, [tagged_id, untagged_id])
 
         assert len(rows) == 1
-        assert rows[0]["file_id"] == tagged.id
+        assert rows[0]["file_id"] == tagged_id
 
-    def test_get_by_file_ids_with_hierarchy(self, conn):
-        file1 = crud.file.get_or_create(conn, Path("a.txt"))
-        genre = crud.tag.create(conn, "genre")
-        rock = crud.tag.create(conn, "rock")
-        parent_id = crud.file_tag.attach(conn, file1.id, genre.id)
-        crud.file_tag.attach(conn, file1.id, rock.id, parent_id)
+    def test_get_by_file_ids_with_hierarchy(self, conn, make_tagged_file):
+        file1_id = make_tagged_file("a.txt", [("genre", "rock")])
 
-        rows = crud.file_tag.get_by_file_ids(conn, [file1.id])
+        rows = crud.file_tag.get_by_file_ids(conn, [file1_id])
 
         assert len(rows) == 2
         parent_row = next(r for r in rows if r["parent_id"] is None)
@@ -418,9 +403,9 @@ class TestFileTag:
 
 class TestTagalong:
     @pytest.fixture
-    def two_tags(self, conn) -> tuple[int, int]:
-        t1 = crud.tag.create(conn, "rock")
-        t2 = crud.tag.create(conn, "guitar")
+    def two_tags(self, make_tag) -> tuple[int, int]:
+        t1 = make_tag("rock")
+        t2 = make_tag("guitar")
         return t1.id, t2.id
 
     def test_create(self, conn, two_tags):
@@ -482,59 +467,34 @@ class TestTagalong:
         tag_names = {r["name"] for r in rows}
         assert tag_names == {"A", "B", "C"}
 
-    def test_circular_tagalong_two_nodes(self, conn):
-        """A -> B -> A should not loop infinitely."""
-        a = crud.tag.create(conn, "A")
-        b = crud.tag.create(conn, "B")
-
-        crud.tagalong.create(conn, a.id, b.id)
-        crud.tagalong.create(conn, b.id, a.id)
+    @pytest.mark.parametrize(
+        "names, edges",
+        [
+            pytest.param(["A", "B"], [("A", "B"), ("B", "A")], id="two_node_cycle"),
+            pytest.param(
+                ["A", "B", "C"],
+                [("A", "B"), ("B", "C"), ("C", "A")],
+                id="three_node_cycle",
+            ),
+            pytest.param(["A"], [("A", "A")], id="self_referential"),
+        ],
+    )
+    def test_circular_tagalong_terminates(self, conn, names, edges):
+        """A cycle in the tagalong graph must not cause apply() to loop
+        infinitely, and should still resolve to every tag in the cycle."""
+        tags = {name: crud.tag.create(conn, name) for name in names}
+        for source, target in edges:
+            crud.tagalong.create(conn, tags[source].id, tags[target].id)
 
         file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        crud.file_tag.attach(conn, file_row.id, a.id)
+        crud.file_tag.attach(conn, file_row.id, tags[names[0]].id)
 
         # Should complete without hanging
         crud.tagalong.apply(conn, [file_row.id])
 
         rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
         tag_names = {r["name"] for r in rows}
-        assert tag_names == {"A", "B"}
-
-    def test_circular_tagalong_three_nodes(self, conn):
-        """A -> B -> C -> A should not loop infinitely."""
-        a = crud.tag.create(conn, "A")
-        b = crud.tag.create(conn, "B")
-        c = crud.tag.create(conn, "C")
-
-        crud.tagalong.create(conn, a.id, b.id)
-        crud.tagalong.create(conn, b.id, c.id)
-        crud.tagalong.create(conn, c.id, a.id)
-
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        crud.file_tag.attach(conn, file_row.id, a.id)
-
-        # Should complete without hanging
-        crud.tagalong.apply(conn, [file_row.id])
-
-        rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        tag_names = {r["name"] for r in rows}
-        assert tag_names == {"A", "B", "C"}
-
-    def test_self_referential_tagalong(self, conn):
-        """A -> A should not cause issues."""
-        a = crud.tag.create(conn, "A")
-
-        crud.tagalong.create(conn, a.id, a.id)
-
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        crud.file_tag.attach(conn, file_row.id, a.id)
-
-        # Should complete without hanging
-        crud.tagalong.apply(conn, [file_row.id])
-
-        rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        tag_names = {r["name"] for r in rows}
-        assert tag_names == {"A"}
+        assert tag_names == set(names)
 
 
 class TestCascadeDeletes:
@@ -577,58 +537,39 @@ class TestCascadeDeletes:
         rows = crud.tagalong.get_all_names(conn)
         assert rows == []
 
-    def test_delete_parent_file_tag_cascades_to_children(self, conn):
-        """Deleting a parent file_tag should delete its children."""
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        parent_tag = crud.tag.create(conn, "genre")
-        child_tag = crud.tag.create(conn, "rock")
-        grandchild_tag = crud.tag.create(conn, "classic")
+    @pytest.mark.parametrize(
+        "tag_names, detach_name, expected_remaining",
+        [
+            pytest.param(
+                ("genre", "rock", "classic"),
+                "genre",
+                [],
+                id="delete_parent_cascades_to_children_and_grandchildren",
+            ),
+            pytest.param(
+                ("genre", "rock"),
+                "rock",
+                ["genre"],
+                id="delete_child_preserves_parent",
+            ),
+            pytest.param(
+                ("genre", "rock", "classic"),
+                "rock",
+                ["genre"],
+                id="delete_child_cascades_to_grandchildren_preserves_parent",
+            ),
+        ],
+    )
+    def test_detach_cascades_down_the_tree(
+        self, conn, make_tagged_file, tag_names, detach_name, expected_remaining
+    ):
+        """Detaching a file_tag should cascade to its descendants, while
+        leaving its ancestors (and siblings) untouched."""
+        fid = make_tagged_file("test.txt", [tag_names])
+        rows = crud.file_tag.get_by_file_ids(conn, [fid])
+        ft_id_by_name = {r["name"]: r["id"] for r in rows}
 
-        parent_ft_id = crud.file_tag.attach(conn, file_row.id, parent_tag.id)
-        child_ft_id = crud.file_tag.attach(
-            conn, file_row.id, child_tag.id, parent_ft_id
-        )
-        crud.file_tag.attach(conn, file_row.id, grandchild_tag.id, child_ft_id)
+        crud.file_tag.detach(conn, ft_id_by_name[detach_name])
 
-        # Delete parent - should cascade to child and grandchild
-        crud.file_tag.detach(conn, parent_ft_id)
-
-        rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        assert rows == []
-
-    def test_delete_child_file_tag_preserves_parent(self, conn):
-        """Deleting a child file_tag should preserve the parent."""
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        parent_tag = crud.tag.create(conn, "genre")
-        child_tag = crud.tag.create(conn, "rock")
-
-        parent_ft_id = crud.file_tag.attach(conn, file_row.id, parent_tag.id)
-        child_ft_id = crud.file_tag.attach(
-            conn, file_row.id, child_tag.id, parent_ft_id
-        )
-
-        crud.file_tag.detach(conn, child_ft_id)
-
-        rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        assert len(rows) == 1
-        assert rows[0]["name"] == "genre"
-
-    def test_delete_child_file_tag_cascades_to_grandchildren(self, conn):
-        """Deleting a child file_tag should delete its children but preserve parent."""
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        parent_tag = crud.tag.create(conn, "genre")
-        child_tag = crud.tag.create(conn, "rock")
-        grandchild_tag = crud.tag.create(conn, "classic")
-
-        parent_ft_id = crud.file_tag.attach(conn, file_row.id, parent_tag.id)
-        child_ft_id = crud.file_tag.attach(
-            conn, file_row.id, child_tag.id, parent_ft_id
-        )
-        crud.file_tag.attach(conn, file_row.id, grandchild_tag.id, child_ft_id)
-
-        # Delete child - should cascade to grandchild but preserve parent
-        crud.file_tag.detach(conn, child_ft_id)
-
-        rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        assert len(rows) == 1
-        assert rows[0]["name"] == "genre"
+        remaining = crud.file_tag.get_by_file_ids(conn, [fid])
+        assert [r["name"] for r in remaining] == expected_remaining

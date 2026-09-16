@@ -127,50 +127,28 @@ class TestParseForStorage:
     def test_nested_tag_valid(self):
         assert parse_for_storage("a[b]") == Tag("a", Tag("b"))
 
-    def test_or_rejected(self):
+    @pytest.mark.parametrize(
+        "expr",
+        ["a|b", "!a", "*", "~"],
+        ids=["or", "not", "wildcard", "null"],
+    )
+    def test_rejected(self, expr):
         with pytest.raises(ValueError):
-            parse_for_storage("a|b")
-
-    def test_not_rejected(self):
-        with pytest.raises(ValueError):
-            parse_for_storage("!a")
-
-    def test_wildcard_rejected(self):
-        with pytest.raises(ValueError):
-            parse_for_storage("*")
-
-    def test_null_rejected(self):
-        with pytest.raises(ValueError):
-            parse_for_storage("~")
+            parse_for_storage(expr)
 
 
 class TestAstStr:
-    def test_roundtrip_simple(self):
-        ast = Tag("a")
-        assert str(ast) == "a"
-        assert _string_to_ast(str(ast)) == ast
-
-    def test_roundtrip_nested(self):
-        ast = Tag("a", Tag("b"))
-        assert str(ast) == "a[b]"
-        assert _string_to_ast(str(ast)) == ast
-
-    def test_roundtrip_and(self):
-        ast = And([Tag("a"), Tag("b")])
-        assert str(ast) == "a,b"
-        assert _string_to_ast(str(ast)) == ast
-
-    def test_roundtrip_or(self):
-        ast = Or([Tag("a"), Tag("b")])
-        assert str(ast) == "a|b"
-        assert _string_to_ast(str(ast)) == ast
-
-    def test_roundtrip_not(self):
-        ast = Not(Tag("a"))
-        assert str(ast) == "!a"
-        assert _string_to_ast(str(ast)) == ast
-
-    def test_roundtrip_only_one(self):
-        ast = OnlyOne([Tag("a"), Tag("b")])
-        assert str(ast) == "xor(a,b)"
+    @pytest.mark.parametrize(
+        "ast, expected_str",
+        [
+            pytest.param(Tag("a"), "a", id="simple"),
+            pytest.param(Tag("a", Tag("b")), "a[b]", id="nested"),
+            pytest.param(And([Tag("a"), Tag("b")]), "a,b", id="and"),
+            pytest.param(Or([Tag("a"), Tag("b")]), "a|b", id="or"),
+            pytest.param(Not(Tag("a")), "!a", id="not"),
+            pytest.param(OnlyOne([Tag("a"), Tag("b")]), "xor(a,b)", id="only_one"),
+        ],
+    )
+    def test_roundtrip(self, ast, expected_str):
+        assert str(ast) == expected_str
         assert _string_to_ast(str(ast)) == ast

@@ -15,6 +15,8 @@ dev = [
     "coverage>=7.5.3",
     "mypy>=1.10.0",
     "lark>=1.1.9",
+    "pytest-xdist>=3.8.0",
+    "pytest-cov>=7.1.0",
 ]
 
 [project.scripts]
@@ -27,6 +29,10 @@ check_untyped_defs = true
 [[tool.mypy.overrides]]
 module = "tagumori.query.parser"
 ignore_errors = true
+
+[tool.coverage.run]
+source = ["tagumori"]
+omit = ["tagumori/query/parser.py"]
 
 
 [build-system]

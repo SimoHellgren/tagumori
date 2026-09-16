@@ -4,3 +4,4 @@ vault*.json
 *.pyc
 *.egg-info
 .coverage
+htmlcov/
