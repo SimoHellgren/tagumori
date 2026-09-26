@@ -253,3 +253,33 @@ def validate_for_storage(node: Expr) -> bool:
 
         case _:
             return False
+
+
+def and_(*operands: Expr) -> Expr | None:
+    """A 'smart' constuctor for And:
+    Wraps operands in And if necessary
+    """
+    ops = [o for o in operands if o is not None]
+
+    if not ops:
+        return None
+
+    if len(ops) == 1:
+        return ops[0]
+
+    return And(ops)
+
+
+def or_(*operands: Expr) -> Expr | None:
+    """A 'smart' constuctor for Or:
+    Wraps operands in Or if necessary
+    """
+    ops = [o for o in operands if o is not None]
+
+    if not ops:
+        return None
+
+    if len(ops) == 1:
+        return ops[0]
+
+    return Or(ops)
