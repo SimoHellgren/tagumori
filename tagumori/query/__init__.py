@@ -15,12 +15,11 @@ def _string_to_ast(string: str) -> Expr:
 
 def search(
     conn: Connection,
-    string: str,
+    query_expr: Expr,
     get_all_ids: Callable[[], set[int]],
     case: bool = True,
 ) -> set[int]:
-    ast = _string_to_ast(string)
-    query_plan = simplify(to_query_plan(ast))
+    query_plan = simplify(to_query_plan(query_expr))
     return execute(conn, query_plan, get_all_ids, case)
 
 

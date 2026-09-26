@@ -8,6 +8,7 @@ from tagumori import crud, service
 from tagumori.commands.common import file_print_options, query_options, regex_options
 from tagumori.commands.context import LazyVault
 from tagumori.models import Query
+from tagumori.query.ast import Expr
 from tagumori.render import format_file_output
 
 
@@ -31,8 +32,8 @@ def query(vault: LazyVault):
 def save(
     vault: LazyVault,
     name: str,
-    select: tuple[str, ...],
-    exclude: tuple[str, ...],
+    select: Expr | None,
+    exclude: Expr | None,
     ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,

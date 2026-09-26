@@ -209,8 +209,8 @@ def lookup_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
 
 def list_files(
     conn: Connection,
-    select: Sequence[str],
-    exclude: Sequence[str],
+    select: Expr | None,
+    exclude: Expr | None,
     ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,
@@ -231,29 +231,21 @@ def list_files(
 
 def execute_query(
     conn: Connection,
-    select_strs: Sequence[str],
-    exclude_strs: Sequence[str],
+    select: Expr | None,
+    exclude: Expr | None,
     ignore_tag_case: bool = False,
     pattern: str = ".*",
     ignore_case: bool = False,
     invert_match: bool = False,
 ) -> list[File]:
 
-    query_parts = []
+    if select or exclude:
+        query_expr = And(operands=[*filter(None, [select, exclude])])
 
-    if select_strs:
-        query_parts.append("|".join(select_strs))
-
-    if exclude_strs:
-        query_parts.append("|".join(f"!{e}" for e in exclude_strs))
-
-    query_str = ",".join(query_parts)
-
-    if query_str:
         # pass lambdafunc to let dependent funcs to get file ids lazily
         ids = search(
             conn,
-            query_str,
+            query_expr,
             lambda: {x.id for x in crud.file.get_all(conn)},
             not ignore_tag_case,
         )

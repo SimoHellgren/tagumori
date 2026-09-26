@@ -7,6 +7,7 @@ from tagumori import service
 from tagumori.commands import db, file, query, review, tag, tagalong
 from tagumori.commands.common import file_print_options, query_options, regex_options
 from tagumori.commands.context import LazyVault
+from tagumori.query.ast import Expr
 from tagumori.render import format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
@@ -118,8 +119,8 @@ def drop(vault: LazyVault, files: Sequence[Path], retain_file: bool):
 def ls(
     vault: LazyVault,
     long: bool,
-    select: Sequence[str],
-    exclude: Sequence[str],
+    select: Expr | None,
+    exclude: Expr | None,
     ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,

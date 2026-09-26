@@ -4,6 +4,75 @@ from pathlib import Path
 
 import click
 
+from tagumori.query import _string_to_ast
+from tagumori.query.ast import Expr, Not, Or, validate_for_storage
+
+
+class TagQuery(click.ParamType):
+    name = "tag query"
+
+    def convert(self, value, param, ctx):
+
+        return _string_to_ast(value)
+
+
+class TagTree(TagQuery):
+    name = "tag tree"
+
+    def convert(self, value, param, ctx):
+
+        parsed = super().convert(value, param, ctx)
+
+        if not validate_for_storage(parsed):
+            self.fail(
+                "Only AND and actual tags (no wildcards) are allowed for storage.",
+                param,
+                ctx,
+            )
+
+        return parsed
+
+
+def select_callback(ctx, param, value) -> Expr | None:
+    """Wraps multiple instances of tag queries in and OR node."""
+
+    if not value:
+        return None
+
+    if len(value) == 1:
+        return value[0]
+
+    return Or(operands=list(value))
+
+
+def exclude_callback(ctx, param, value) -> Expr | None:
+    """Wraps multiple instances of tag queries in and OR node."""
+    if not value:
+        return None
+
+    if len(value) == 1:
+        return Not(value[0])
+
+    return Or(operands=[Not(v) for v in value])
+
+
+def query_options(func):
+    func = click.option(
+        "-s", "--select", multiple=True, type=TagQuery(), callback=select_callback
+    )(func)
+    func = click.option(
+        "-e",
+        "--exclude",
+        multiple=True,
+        type=TagQuery(),
+        callback=exclude_callback,
+    )(func)
+    func = click.option(
+        "-I", "--ignore-tag-case", is_flag=True, help="Ignore tag case."
+    )(func)
+
+    return func
+
 
 def regex_options(func):
     func = click.option(
@@ -18,16 +87,6 @@ def regex_options(func):
         is_flag=True,
         help="Inverts the regex match (not select/exclude).",
     )(func)
-    return func
-
-
-def query_options(func):
-    func = click.option("-s", "--select", multiple=True)(func)
-    func = click.option("-e", "--exclude", multiple=True)(func)
-    func = click.option(
-        "-I", "--ignore-tag-case", is_flag=True, help="Ignore tag case."
-    )(func)
-
     return func
 
 
