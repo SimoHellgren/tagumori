@@ -1,5 +1,6 @@
 """Module for common resources, such as cli option groups."""
 
+import re
 from pathlib import Path
 
 import click
@@ -66,9 +67,21 @@ def query_options(func):
     return func
 
 
+def validate_regex(ctx, param, value):
+    try:
+        re.compile(value)
+    except re.error as e:
+        raise click.BadParameter(f"Invalid regex: {e}") from e
+    return value
+
+
 def regex_options(func):
     func = click.option(
-        "-p", "--pattern", help="Filter output by regex pattern.", default=r".*"
+        "-p",
+        "--pattern",
+        help="Filter output by regex pattern.",
+        default=r".*",
+        callback=validate_regex,
     )(func)
     func = click.option("-i", "--ignore-case", is_flag=True, help="Ignore regex case.")(
         func
