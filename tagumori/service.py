@@ -6,7 +6,7 @@ from sqlite3 import Connection, Row
 
 from tagumori import crud
 from tagumori.models import File, TaggedFile
-from tagumori.query import parse_for_storage, search
+from tagumori.query import search
 from tagumori.query.ast import And, Expr, Tag, and_
 from tagumori.utils import compile_pattern
 
@@ -133,14 +133,10 @@ def add_tags_to_files(
         )
 
 
-def remove_tags_from_files(
-    conn: Connection, files: Sequence[Path], tags: Sequence[str]
-):
-    tag_expr = ",".join(tags)
-    node = parse_for_storage(tag_expr)
+def remove_tags_from_files(conn: Connection, files: Sequence[Path], tags: Expr):
 
     # remove only leafs
-    unwanted = set(_ast_to_leaf_paths(node))
+    unwanted = set(_ast_to_leaf_paths(tags))
 
     # fetch files and their tags
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
@@ -156,14 +152,11 @@ def remove_tags_from_files(
 def set_tags_on_files(
     conn: Connection,
     files: Sequence[Path],
-    tags: Sequence[str],
+    tags: Expr,
     apply_tagalongs: bool = True,
 ):
-    tag_expr = ",".join(tags)
-    node = parse_for_storage(tag_expr)
-
     # get closure of tags/paths to retain
-    keep = _ast_to_path_closure(node)
+    keep = _ast_to_path_closure(tags)
 
     # fetch files and their tags
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]

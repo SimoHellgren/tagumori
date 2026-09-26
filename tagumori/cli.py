@@ -80,9 +80,16 @@ def add(
     type=click.Path(path_type=Path, exists=True),
     multiple=True,
 )
-@click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
+@click.option(
+    "-t",
+    "tags",
+    required=True,
+    type=TagTree(),
+    multiple=True,
+    callback=tag_tree_callback,
+)
 @click.pass_obj
-def remove(vault: LazyVault, files: Sequence[Path], tags: Sequence[str]):
+def remove(vault: LazyVault, files: Sequence[Path], tags: Expr):
     with vault as conn:
         service.remove_tags_from_files(conn, files, tags)
 
@@ -95,7 +102,14 @@ def remove(vault: LazyVault, files: Sequence[Path], tags: Sequence[str]):
     type=click.Path(path_type=Path, exists=True),
     multiple=True,
 )
-@click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
+@click.option(
+    "-t",
+    "tags",
+    required=True,
+    type=TagTree(),
+    multiple=True,
+    callback=tag_tree_callback,
+)
 @click.option(
     "--tagalongs/--no-tagalongs",
     type=click.BOOL,
@@ -103,7 +117,7 @@ def remove(vault: LazyVault, files: Sequence[Path], tags: Sequence[str]):
     help="Apply / don't apply tagalongs.",
 )
 @click.pass_obj
-def set_(vault: LazyVault, files: Sequence[Path], tags: Sequence[str], tagalongs: bool):
+def set_(vault: LazyVault, files: Sequence[Path], tags: Expr, tagalongs: bool):
 
     with vault as conn:
         service.set_tags_on_files(conn, files, tags, tagalongs)
