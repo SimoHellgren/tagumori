@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 
 from tagumori.query import _string_to_ast
-from tagumori.query.ast import Expr, Not, or_, validate_for_storage
+from tagumori.query.ast import Expr, Not, and_, or_, validate_for_storage
 
 
 class TagQuery(click.ParamType):
@@ -31,6 +31,16 @@ class TagTree(TagQuery):
             )
 
         return parsed
+
+
+def tag_tree_callback(ctx, param, value) -> Expr:
+    result = and_(*value)
+
+    # -t is required, meaning result is never None.
+    # This assert is here to make mypy happy
+    assert result is not None
+
+    return result
 
 
 def select_callback(ctx, param, value) -> Expr | None:

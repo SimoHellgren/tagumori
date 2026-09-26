@@ -5,7 +5,13 @@ import click
 
 from tagumori import service
 from tagumori.commands import db, file, query, review, tag, tagalong
-from tagumori.commands.common import file_print_options, query_options, regex_options
+from tagumori.commands.common import (
+    TagTree,
+    file_print_options,
+    query_options,
+    regex_options,
+    tag_tree_callback,
+)
 from tagumori.commands.context import LazyVault
 from tagumori.query.ast import Expr
 from tagumori.render import format_file_output
@@ -41,7 +47,14 @@ cli.add_command(review.review)
     type=click.Path(path_type=Path, exists=True),
     multiple=True,
 )
-@click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
+@click.option(
+    "-t",
+    "tags",
+    required=True,
+    type=TagTree(),
+    multiple=True,
+    callback=tag_tree_callback,
+)
 @click.option(
     "--tagalongs/--no-tagalongs",
     type=click.BOOL,
@@ -52,7 +65,7 @@ cli.add_command(review.review)
 def add(
     vault: LazyVault,
     files: Sequence[Path],
-    tags: Sequence[str],
+    tags: Expr,
     tagalongs: bool,
 ):
     with vault as conn:

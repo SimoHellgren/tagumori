@@ -259,27 +259,24 @@ def and_(*operands: Expr) -> Expr | None:
     """A 'smart' constuctor for And:
     Wraps operands in And if necessary
     """
-    ops = [o for o in operands if o is not None]
-
-    if not ops:
+    if not operands:
         return None
 
-    if len(ops) == 1:
-        return ops[0]
+    if len(operands) == 1:
+        return operands[0]
 
-    return And(ops)
+    return And(operands)
 
 
 def or_(*operands: Expr) -> Expr | None:
     """A 'smart' constuctor for Or:
     Wraps operands in Or if necessary
     """
-    ops = [o for o in operands if o is not None]
 
-    if not ops:
+    if not operands:
         return None
 
-    if len(ops) == 1:
-        return ops[0]
+    if len(operands) == 1:
+        return operands[0]
 
-    return Or(ops)
+    return Or(operands)

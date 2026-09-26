@@ -118,16 +118,13 @@ def attach_tree(
 def add_tags_to_files(
     conn: Connection,
     files: Sequence[Path],
-    tags: Sequence[str],
+    tags: Expr,
     apply_tagalongs: bool = True,
 ):
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
 
-    tag_expr = ",".join(tags)
-    node = parse_for_storage(tag_expr)
-
     for file_id in file_ids:
-        attach_tree(conn, file_id, node)
+        attach_tree(conn, file_id, tags)
 
     if apply_tagalongs:
         crud.tagalong.apply(
@@ -239,7 +236,7 @@ def execute_query(
     invert_match: bool = False,
 ) -> list[File]:
 
-    query_expr = and_(select, exclude)
+    query_expr = and_(*[x for x in [select, exclude] if x is not None])
 
     if query_expr:
         # pass lambdafunc to let dependent funcs to get file ids lazily
