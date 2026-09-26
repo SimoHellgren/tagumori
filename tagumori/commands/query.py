@@ -40,29 +40,27 @@ def save(
     invert_match: bool,
     force: bool,
 ):
-    import json
-
-    data = {
-        "name": name,
-        "select_tags": json.dumps(list(select)),
-        "exclude_tags": json.dumps(list(exclude)),
-        "ignore_tag_case": ignore_tag_case,
-        "pattern": pattern,
-        "ignore_case": ignore_case,
-        "invert_match": invert_match,
-    }
-
     with vault as conn:
-        if force:
-            crud.query.upsert(conn, **data)
+        if not force and crud.query.get_by_name(conn, name):
+            raise click.ClickException(
+                f"Query '{name}' already exists. Run with --force to overwrite."
+            )
 
-        else:
-            # check if exists
-            if crud.query.get_by_name(conn, name):
-                raise click.ClickException(
-                    f"Query '{name}' already exists. Run with --force to overwrite."
-                )
-            crud.query.create(conn, **data)
+        import json
+
+        selects = [str(select)] if select else []
+        excludes = [str(exclude)] if exclude else []
+
+        crud.query.upsert(
+            conn,
+            name=name,
+            select_tags=json.dumps(selects),
+            exclude_tags=json.dumps(excludes),
+            ignore_tag_case=ignore_tag_case,
+            pattern=pattern,
+            ignore_case=ignore_case,
+            invert_match=invert_match,
+        )
 
 
 @query.command(help="Run saved queries")
