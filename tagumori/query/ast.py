@@ -23,7 +23,7 @@ class Xor:
     operands: list["Expr"]
 
     def __str__(self) -> str:
-        return "^".join(str(op) for op in self.operands)
+        return "^".join(_wrap(self, op) for op in self.operands)
 
 
 @dataclass
@@ -33,7 +33,7 @@ class OnlyOne:
     operands: list["Expr"]
 
     def __str__(self) -> str:
-        ops = ",".join(str(op) for op in self.operands)
+        ops = ",".join(_wrap(self, op) for op in self.operands)
         return f"xor({ops})"
 
 
@@ -42,7 +42,7 @@ class And:
     operands: Sequence["Expr"]
 
     def __str__(self) -> str:
-        return ",".join(str(op) for op in self.operands)
+        return ",".join(_wrap(self, op) for op in self.operands)
 
 
 @dataclass
@@ -50,7 +50,7 @@ class Or:
     operands: list["Expr"]
 
     def __str__(self) -> str:
-        return "|".join(str(op) for op in self.operands)
+        return "|".join(_wrap(self, op) for op in self.operands)
 
 
 @dataclass
@@ -58,7 +58,7 @@ class Not:
     operand: "Expr"
 
     def __str__(self) -> str:
-        return f"!{self.operand}"
+        return f"!{_wrap(self, self.operand)}"
 
 
 @dataclass
@@ -104,6 +104,33 @@ class WildcardBounded:
             return f"*{self.max_depth}*"
 
         return f"*{self.max_depth}*[{self.children}]"
+
+
+def precedence(expr: "Expr") -> int:
+    match expr:
+        case Xor():
+            return 0
+
+        case Or():
+            return 1
+
+        case And():
+            return 2
+
+        case Not():
+            return 3
+
+        case _:
+            return 4
+
+
+def _wrap(parent: "Expr", operand: "Expr") -> str:
+    rendered = str(operand)
+
+    if precedence(operand) < precedence(parent):
+        return f"({rendered})"
+
+    return rendered
 
 
 class Transformer(StandaloneTransformer):
