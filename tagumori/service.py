@@ -7,7 +7,7 @@ from sqlite3 import Connection, Row
 from tagumori import crud
 from tagumori.models import File, TaggedFile
 from tagumori.query import search
-from tagumori.query.ast import And, Expr, Tag, and_
+from tagumori.query.ast import And, Expr, Not, Tag, and_
 from tagumori.utils import compile_pattern
 
 flatten = chain.from_iterable
@@ -229,7 +229,8 @@ def execute_query(
     invert_match: bool = False,
 ) -> list[File]:
 
-    query_expr = and_(*[x for x in [select, exclude] if x is not None])
+    negated_exclude = Not(exclude) if exclude is not None else None
+    query_expr = and_(*[x for x in [select, negated_exclude] if x is not None])
 
     if query_expr:
         # pass lambdafunc to let dependent funcs to get file ids lazily

@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 
 from tagumori.query import _string_to_ast
-from tagumori.query.ast import Expr, Not, and_, or_, validate_for_storage
+from tagumori.query.ast import Expr, and_, or_, validate_for_storage
 
 
 class TagQuery(click.ParamType):
@@ -43,26 +43,21 @@ def tag_tree_callback(ctx, param, value) -> Expr:
     return result
 
 
-def select_callback(ctx, param, value) -> Expr | None:
+def query_callback(ctx, param, value) -> Expr | None:
     """Wraps multiple instances of tag queries in and OR node."""
     return or_(*value)
 
 
-def exclude_callback(ctx, param, value) -> Expr | None:
-    """Wraps multiple instances of tag queries in and OR node."""
-    return or_(*map(Not, value))
-
-
 def query_options(func):
     func = click.option(
-        "-s", "--select", multiple=True, type=TagQuery(), callback=select_callback
+        "-s", "--select", multiple=True, type=TagQuery(), callback=query_callback
     )(func)
     func = click.option(
         "-e",
         "--exclude",
         multiple=True,
         type=TagQuery(),
-        callback=exclude_callback,
+        callback=query_callback,
     )(func)
     func = click.option(
         "-I", "--ignore-tag-case", is_flag=True, help="Ignore tag case."

@@ -5,7 +5,8 @@ from pathlib import Path
 from sqlite3 import Row
 from typing import Self
 
-from tagumori.query.ast import Expr
+from tagumori.query import _string_to_ast
+from tagumori.query.ast import Expr, or_
 
 
 class FileStatus(Enum):
@@ -65,8 +66,8 @@ class Tag(RowModel):
 class Query(RowModel):
     id: int
     name: str
-    select_tags: tuple[str, ...]  # json in db
-    exclude_tags: tuple[str, ...]  # json in db
+    select_tags: Expr | None  # json in db
+    exclude_tags: Expr | None  # json in db
     pattern: str
     ignore_case: bool  # integer in db
     invert_match: bool
@@ -74,11 +75,17 @@ class Query(RowModel):
 
     @classmethod
     def from_row(cls, row) -> "Query":
+        select_array = json.loads(row["select_tags"] or "[]")
+        exclude_array = json.loads(row["exclude_tags"] or "[]")
+
+        selects = or_(*map(_string_to_ast, select_array))
+        excludes = or_(*map(_string_to_ast, exclude_array))
+
         return cls(
             id=row["id"],
             name=row["name"],
-            select_tags=tuple(json.loads(row["select_tags"] or "[]")),
-            exclude_tags=tuple(json.loads(row["exclude_tags"] or "[]")),
+            select_tags=selects,
+            exclude_tags=excludes,
             pattern=row["pattern"] or r".*",
             ignore_case=bool(row["ignore_case"]),
             invert_match=bool(row["invert_match"]),

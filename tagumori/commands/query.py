@@ -129,8 +129,8 @@ def run(
 
 def ls_long_format(data: Query):
 
-    selects = " ".join(f"-s {x}" for x in data.select_tags)
-    excludes = " ".join(f"-e {x}" for x in data.exclude_tags)
+    selects = f"-s {x}" if (x := data.select_tags) else ""
+    excludes = f"-e {x}" if (x := data.exclude_tags) else ""
 
     flag_map = [
         ("-I", data.ignore_tag_case),
