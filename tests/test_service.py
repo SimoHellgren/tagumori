@@ -1,7 +1,8 @@
 from pathlib import Path
 
 from tagumori import crud, service
-from tagumori.query import parse_for_storage
+from tagumori.query import _string_to_ast, parse_for_storage
+from tagumori.query.ast import Expr
 
 
 def _leaf_paths(conn, file: Path) -> set[tuple[str, ...]]:
@@ -12,16 +13,18 @@ def _leaf_paths(conn, file: Path) -> set[tuple[str, ...]]:
     return service._db_tags_to_leaf_paths(rows)
 
 
+def _expr(string: str) -> Expr:
+    return _string_to_ast(string)
+
+
 class TestSearchFiles:
     def test_select_nonexistent_tag_returns_empty(self, conn, make_file):
         """Selecting a tag that no file has should return no files, not all files."""
         file = make_file()
 
-        service.add_tags_to_files(conn, [file], ["rock"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file], _expr("rock"), apply_tagalongs=False)
 
-        result = service.execute_query(
-            conn, select_strs=["nonexistent"], exclude_strs=[]
-        )
+        result = service.execute_query(conn, select=_expr("nonexistent"), exclude=None)
 
         assert result == []
 
@@ -30,10 +33,10 @@ class TestSearchFiles:
         file1 = make_file("rock.txt")
         file2 = make_file("jazz.txt")
 
-        service.add_tags_to_files(conn, [file1], ["rock"], apply_tagalongs=False)
-        service.add_tags_to_files(conn, [file2], ["jazz"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file1], _expr("rock"), apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file2], _expr("jazz"), apply_tagalongs=False)
 
-        result = service.execute_query(conn, select_strs=["rock"], exclude_strs=[])
+        result = service.execute_query(conn, select=_expr("rock"), exclude=None)
 
         assert len(result) == 1
         assert result[0].path == file1.resolve()
@@ -43,10 +46,10 @@ class TestSearchFiles:
         file1 = make_file("rock.txt")
         file2 = make_file("jazz.txt")
 
-        service.add_tags_to_files(conn, [file1], ["rock"], apply_tagalongs=False)
-        service.add_tags_to_files(conn, [file2], ["jazz"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file1], _expr("rock"), apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file2], _expr("jazz"), apply_tagalongs=False)
 
-        result = service.execute_query(conn, select_strs=[], exclude_strs=["rock"])
+        result = service.execute_query(conn, select=None, exclude=_expr("rock"))
 
         assert len(result) == 1
         assert result[0].path == file2.resolve()
@@ -55,9 +58,9 @@ class TestSearchFiles:
         """Tag search is case-sensitive by default."""
         file = make_file()
 
-        service.add_tags_to_files(conn, [file], ["Rock"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file], _expr("Rock"), apply_tagalongs=False)
 
-        result = service.execute_query(conn, select_strs=["rock"], exclude_strs=[])
+        result = service.execute_query(conn, select=_expr("rock"), exclude=None)
 
         assert result == []
 
@@ -65,10 +68,10 @@ class TestSearchFiles:
         """With ignore_tag_case, tag search should be case-insensitive."""
         file = make_file()
 
-        service.add_tags_to_files(conn, [file], ["Rock"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file], _expr("Rock"), apply_tagalongs=False)
 
         result = service.execute_query(
-            conn, select_strs=["rock"], exclude_strs=[], ignore_tag_case=True
+            conn, select=_expr("rock"), exclude=None, ignore_tag_case=True
         )
 
         assert len(result) == 1
@@ -228,7 +231,11 @@ class TestAstToClosure:
 
     def test_linear_chain_includes_every_ancestor(self):
         node = parse_for_storage("a[b[c]]")
-        assert service._ast_to_path_closure(node) == {("a",), ("a", "b"), ("a", "b", "c")}
+        assert service._ast_to_path_closure(node) == {
+            ("a",),
+            ("a", "b"),
+            ("a", "b", "c"),
+        }
 
     def test_branching_tree_is_flattened(self):
         """Regression: an And nested under a Tag used to come back as a
