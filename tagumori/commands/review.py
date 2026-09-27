@@ -62,7 +62,7 @@ class ReviewSession:
         node = parse_for_storage(expr)
 
         with self.vault as conn:
-            service.add_tags_to_files(conn, [self.current], [expr])
+            service.add_tags_to_files(conn, [self.current], node)
 
         # TODO: should probably make _ast_to_leaf_paths a public method
         # TODO: paths is also a bit overkill - could just recurse to get unique tags
