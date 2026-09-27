@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from tagumori.models import File, Query, Tag, TaggedFile
+from tagumori.query import ast
 
 
 @pytest.mark.parametrize(
@@ -96,16 +97,16 @@ class TestQueryFromRow:
 
         query = Query.from_row(row)
 
-        assert query.select_tags == ("rock", "jazz")
-        assert query.exclude_tags == ("blues",)
+        assert query.select_tags == ast.Or([ast.Tag("rock"), ast.Tag("jazz")])
+        assert query.exclude_tags == ast.Tag("blues")
 
     def test_defaults_select_and_exclude_tags_to_empty_when_null(self, conn):
         row = self._insert(conn, select_tags=None, exclude_tags=None)
 
         query = Query.from_row(row)
 
-        assert query.select_tags == ()
-        assert query.exclude_tags == ()
+        assert query.select_tags == None
+        assert query.exclude_tags == None
 
     def test_defaults_pattern_when_null(self, conn):
         row = self._insert(conn, pattern=None)

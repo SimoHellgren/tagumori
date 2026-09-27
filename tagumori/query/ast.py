@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from dataclasses import dataclass
 
 from tagumori.query.parser import Transformer as StandaloneTransformer
@@ -39,7 +38,7 @@ class OnlyOne:
 
 @dataclass
 class And:
-    operands: Sequence["Expr"]
+    operands: list["Expr"]
 
     def __str__(self) -> str:
         return ",".join(_wrap(self, op) for op in self.operands)
@@ -265,7 +264,8 @@ def and_(*operands: Expr) -> Expr | None:
     if len(operands) == 1:
         return operands[0]
 
-    return And(operands)
+    # explicit `list` for type correctness
+    return And(list(operands))
 
 
 def or_(*operands: Expr) -> Expr | None:
@@ -279,4 +279,5 @@ def or_(*operands: Expr) -> Expr | None:
     if len(operands) == 1:
         return operands[0]
 
-    return Or(operands)
+    # explicit `list` for type correctness
+    return Or(list(operands))
