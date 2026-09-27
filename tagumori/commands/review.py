@@ -1,6 +1,5 @@
 import cmd
 import sys
-from itertools import chain
 from pathlib import Path
 from typing import TextIO
 
@@ -15,8 +14,7 @@ from tagumori.commands.context import LazyVault
 from tagumori.query import parse_for_storage
 from tagumori.query.parser import UnexpectedCharacters, UnexpectedToken
 from tagumori.render import print_file_info
-
-flatten = chain.from_iterable
+from tagumori.utils import flatten
 
 
 class ReviewSession:

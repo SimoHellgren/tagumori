@@ -1,6 +1,6 @@
 from collections import defaultdict
 from collections.abc import Sequence
-from itertools import chain, groupby
+from itertools import groupby
 from pathlib import Path
 from sqlite3 import Connection, Row
 
@@ -8,9 +8,7 @@ from tagumori import crud
 from tagumori.models import File, TaggedFile
 from tagumori.query import search
 from tagumori.query.ast import And, Expr, Not, Tag, and_
-from tagumori.utils import compile_pattern
-
-flatten = chain.from_iterable
+from tagumori.utils import compile_pattern, flatten
 
 
 # utilities for turning the db file_tag structures to AST and paths

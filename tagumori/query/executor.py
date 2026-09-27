@@ -2,7 +2,6 @@ import sqlite3
 from collections import Counter
 from collections.abc import Callable, Sequence
 from functools import cache, reduce
-from itertools import chain
 
 from tagumori.query.planner import (
     QP_And,
@@ -16,8 +15,7 @@ from tagumori.query.planner import (
     SegmentWildCardSingle,
     TagPath,
 )
-
-flatten = chain.from_iterable
+from tagumori.utils import flatten
 
 
 def _build_value(segment: Segment):
