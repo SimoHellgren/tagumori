@@ -4,6 +4,7 @@ import pytest
 
 from tagumori import crud
 from tagumori.crud.file import _get_inode_and_device
+from tests.helpers import not_none
 
 
 class TestTagCRUD:
@@ -24,7 +25,7 @@ class TestTagCRUD:
     def test_get_by_name(self, conn):
         crud.tag.create(conn, "rock")
 
-        row = crud.tag.get_by_name(conn, "rock")
+        row = not_none(crud.tag.get_by_name(conn, "rock"))
 
         assert row.name == "rock"
 
@@ -103,7 +104,7 @@ class TestTagCRUD:
 
         crud.tag.update(conn, ["rock"], {"category": "genre"})
 
-        row = crud.tag.get_by_name(conn, "rock")
+        row = not_none(crud.tag.get_by_name(conn, "rock"))
         assert row.category == "genre"
 
     def test_update_multiple(self, conn):
@@ -113,7 +114,7 @@ class TestTagCRUD:
         crud.tag.update(conn, ["rock", "jazz"], {"category": "genre"})
 
         for name in ["rock", "jazz"]:
-            row = crud.tag.get_by_name(conn, name)
+            row = not_none(crud.tag.get_by_name(conn, name))
             assert row.category == "genre"
 
     def test_update_forbidden_column(self, conn):
@@ -199,7 +200,7 @@ class TestFileCRUD:
         crud.file.get_or_create(conn, real_file)
 
         # Re-fetch to get all columns
-        fetched = crud.file.get_by_path(conn, real_file)
+        fetched = not_none(crud.file.get_by_path(conn, real_file))
         stat = real_file.stat()
 
         assert fetched.inode == stat.st_ino
@@ -215,7 +216,7 @@ class TestFileCRUD:
         crud.file.get_or_create_many(conn, [file1, file2])
 
         for path in [file1, file2]:
-            fetched = crud.file.get_by_path(conn, path)
+            fetched = not_none(crud.file.get_by_path(conn, path))
             stat = path.stat()
             assert fetched.inode == stat.st_ino
             assert fetched.device == stat.st_dev
@@ -224,7 +225,9 @@ class TestFileCRUD:
         """For paths that don't exist on disk, inode/device should be null."""
         crud.file.get_or_create(conn, Path("nonexistent.txt"))
 
-        fetched = crud.file.get_by_path(conn, Path("nonexistent.txt").resolve())
+        fetched = not_none(
+            crud.file.get_by_path(conn, Path("nonexistent.txt").resolve())
+        )
 
         assert fetched.inode is None
         assert fetched.device is None
@@ -236,7 +239,7 @@ class TestFileCRUD:
 
         crud.file.get_or_create(conn, real_file)
 
-        fetched = crud.file.get_by_path(conn, real_file)
+        fetched = not_none(crud.file.get_by_path(conn, real_file))
 
         assert fetched.path == real_file.resolve()
 
