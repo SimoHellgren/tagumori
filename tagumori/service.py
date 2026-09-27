@@ -69,6 +69,7 @@ def _ast_to_leaf_paths(node: Expr, prefix=()) -> set[tuple[str, ...]]:
         case Tag(name, None):
             return {prefix + (name,)}
         case Tag(name, children):
+            assert children is not None  # for mypy
             return _ast_to_leaf_paths(children, prefix + (name,))
         case And(operands):
             return {p for op in operands for p in _ast_to_leaf_paths(op, prefix)}
@@ -85,10 +86,14 @@ def _ast_to_path_closure(node: Expr, prefix=()) -> set[tuple[str, ...]]:
         case Tag(name, None):
             return {prefix + (name,)}
         case Tag(name, children):
+            assert children is not None  # for mypy
             here = prefix + (name,)
             return {here} | _ast_to_path_closure(children, here)
         case And(operands):
             return set(flatten(_ast_to_path_closure(op, prefix) for op in operands))
+
+        case _:
+            return set()
 
 
 # TODO: consider removing
@@ -105,6 +110,7 @@ def attach_tree(
             tag = crud.tag.get_or_create(conn, name)
             crud.file_tag.attach(conn, file_id, tag.id, parent_id)
         case Tag(name, children):
+            assert children is not None  # for mypy
             tag = crud.tag.get_or_create(conn, name)
             filetag_id = crud.file_tag.attach(conn, file_id, tag.id, parent_id)
             attach_tree(conn, file_id, children, filetag_id)

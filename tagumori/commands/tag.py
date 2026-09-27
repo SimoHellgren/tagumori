@@ -86,7 +86,10 @@ def remove_tag(vault: LazyVault, tags: tuple[str, ...]):
 
     with vault as conn:
         for tag in tags:
-            tag_id = crud.tag.get_by_name(conn, tag).id
+            if not (db_tag := crud.tag.get_by_name(conn, tag)):
+                raise click.ClickException(f"Tag '{tag}' not found in vault.")
+
+            tag_id = db_tag.id
             crud.tag.delete(conn, tag_id)
 
 
