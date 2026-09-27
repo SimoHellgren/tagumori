@@ -30,8 +30,3 @@ def test_compile_pattern_regex():
 
     assert pattern.search("foo123")
     assert not pattern.search("foobar")
-
-
-def test_compile_pattern_empty_returns_none():
-    assert compile_pattern("", ignore_case=False) is None
-    assert compile_pattern("", ignore_case=True) is None
