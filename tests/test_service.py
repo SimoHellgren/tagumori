@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from tagumori import crud, service
 from tagumori.query import _string_to_ast, parse_for_storage
 from tagumori.query.ast import Expr
@@ -83,68 +85,60 @@ class TestSetTagsOnFiles:
     in a single call, regardless of how deep the unwanted branch is.
     """
 
-    def test_collapses_a_multi_level_unwanted_branch_in_one_call(self, conn, make_file):
-        """The original bug: a[b[c]] -> set b used to take 3 calls to converge."""
+    @pytest.mark.parametrize(
+        "initial, set_to, expected",
+        [
+            pytest.param(
+                "a[b[c]]",
+                "b",
+                {("b",)},
+                id="collapses-multi-level-unwanted-branch-in-one-call",
+            ),
+            pytest.param(
+                "a[b],a[c]",
+                "a[b]",
+                {("a", "b")},
+                id="partial-branch-removal-still-works",
+            ),
+            pytest.param(
+                "a[b[c]]",
+                "a[b]",
+                {("a", "b")},
+                id="shortens-a-branch-by-one-level",
+            ),
+            pytest.param(
+                "a,b",
+                "a",
+                {("a",)},
+                id="drops-a-whole-sibling-tag",
+            ),
+            pytest.param(
+                "a[b[c]]",
+                "a[b[c]]",
+                {("a", "b", "c")},
+                id="setting-to-the-same-tags-is-a-no-op",
+            ),
+            pytest.param(
+                "x[y]",
+                "p[q]",
+                {("p", "q")},
+                id="total-replacement-with-disjoint-tags",
+            ),
+            pytest.param(
+                "a[b]",
+                "a",
+                {("a",)},
+                id="removes-a-leaf-promoting-its-parent",
+            ),
+        ],
+    )
+    def test_set_tags(self, conn, make_file, initial, set_to, expected):
         file = make_file()
 
-        service.add_tags_to_files(conn, [file], ["a[b[c]]"], apply_tagalongs=False)
-        service.set_tags_on_files(conn, [file], ["b"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file], _expr(initial), apply_tagalongs=False)
+        service.set_tags_on_files(conn, [file], _expr(set_to), apply_tagalongs=False)
 
-        assert _leaf_paths(conn, file) == {("b",)}
-
-    def test_partial_branch_removal_still_works(self, conn, make_file):
-        """a[b],a[c] -> set a[b]: the case that already worked before the fix."""
-        file = make_file()
-
-        service.add_tags_to_files(conn, [file], ["a[b],a[c]"], apply_tagalongs=False)
-        service.set_tags_on_files(conn, [file], ["a[b]"], apply_tagalongs=False)
-
-        assert _leaf_paths(conn, file) == {("a", "b")}
-
-    def test_shortens_a_branch_by_one_level(self, conn, make_file):
-        """a[b[c]] -> set a[b]."""
-        file = make_file()
-
-        service.add_tags_to_files(conn, [file], ["a[b[c]]"], apply_tagalongs=False)
-        service.set_tags_on_files(conn, [file], ["a[b]"], apply_tagalongs=False)
-
-        assert _leaf_paths(conn, file) == {("a", "b")}
-
-    def test_drops_a_whole_sibling_tag(self, conn, make_file):
-        """a,b -> set a."""
-        file = make_file()
-
-        service.add_tags_to_files(conn, [file], ["a,b"], apply_tagalongs=False)
-        service.set_tags_on_files(conn, [file], ["a"], apply_tagalongs=False)
-
-        assert _leaf_paths(conn, file) == {("a",)}
-
-    def test_setting_to_the_same_tags_is_a_no_op(self, conn, make_file):
-        """Identity case: set to the tags a file already has."""
-        file = make_file()
-
-        service.add_tags_to_files(conn, [file], ["a[b[c]]"], apply_tagalongs=False)
-        service.set_tags_on_files(conn, [file], ["a[b[c]]"], apply_tagalongs=False)
-
-        assert _leaf_paths(conn, file) == {("a", "b", "c")}
-
-    def test_total_replacement_with_disjoint_tags(self, conn, make_file):
-        """x[y] -> set p[q]: nothing in the new tree overlaps the old one."""
-        file = make_file()
-
-        service.add_tags_to_files(conn, [file], ["x[y]"], apply_tagalongs=False)
-        service.set_tags_on_files(conn, [file], ["p[q]"], apply_tagalongs=False)
-
-        assert _leaf_paths(conn, file) == {("p", "q")}
-
-    def test_removes_a_leaf_promoting_its_parent(self, conn, make_file):
-        """a[b] -> set a."""
-        file = make_file()
-
-        service.add_tags_to_files(conn, [file], ["a[b]"], apply_tagalongs=False)
-        service.set_tags_on_files(conn, [file], ["a"], apply_tagalongs=False)
-
-        assert _leaf_paths(conn, file) == {("a",)}
+        assert _leaf_paths(conn, file) == expected
 
     def test_applies_the_same_result_to_every_file(self, conn, make_file):
         """set on multiple files with different starting tags converges both
@@ -152,41 +146,46 @@ class TestSetTagsOnFiles:
         file1 = make_file("file1.txt")
         file2 = make_file("file2.txt")
 
-        service.add_tags_to_files(conn, [file1], ["a[b[c]]"], apply_tagalongs=False)
-        service.add_tags_to_files(conn, [file2], ["q"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file1], _expr("a[b[c]]"), apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file2], _expr("q"), apply_tagalongs=False)
 
-        service.set_tags_on_files(conn, [file1, file2], ["x[a]"], apply_tagalongs=False)
+        service.set_tags_on_files(conn, [file1, file2], _expr("x[a]"), apply_tagalongs=False)
 
         assert _leaf_paths(conn, file1) == {("x", "a")}
         assert _leaf_paths(conn, file2) == {("x", "a")}
 
 
 class TestRemoveTagsFromFiles:
-    def test_removing_a_node_cascades_its_whole_subtree(self, conn, make_file):
-        """remove -t a on a[b[c]] should drop a, b, and c together."""
+    @pytest.mark.parametrize(
+        "initial, remove, expected",
+        [
+            pytest.param(
+                "a[b[c]]",
+                "a",
+                set(),
+                id="removing-a-node-cascades-its-whole-subtree",
+            ),
+            pytest.param(
+                "a[b,c]",
+                "a[b]",
+                {("a", "c")},
+                id="removing-one-branch-keeps-its-siblings",
+            ),
+            pytest.param(
+                "a[b]",
+                "zzz",
+                {("a", "b")},
+                id="removing-a-nonexistent-tag-is-a-no-op",
+            ),
+        ],
+    )
+    def test_remove_tags(self, conn, make_file, initial, remove, expected):
         file = make_file()
 
-        service.add_tags_to_files(conn, [file], ["a[b[c]]"], apply_tagalongs=False)
-        service.remove_tags_from_files(conn, [file], ["a"])
+        service.add_tags_to_files(conn, [file], _expr(initial), apply_tagalongs=False)
+        service.remove_tags_from_files(conn, [file], _expr(remove))
 
-        assert _leaf_paths(conn, file) == set()
-
-    def test_removing_one_branch_keeps_its_siblings(self, conn, make_file):
-        """a[b,c] -> remove a[b] should leave a[c] untouched."""
-        file = make_file()
-
-        service.add_tags_to_files(conn, [file], ["a[b,c]"], apply_tagalongs=False)
-        service.remove_tags_from_files(conn, [file], ["a[b]"])
-
-        assert _leaf_paths(conn, file) == {("a", "c")}
-
-    def test_removing_a_nonexistent_tag_is_a_no_op(self, conn, make_file):
-        file = make_file()
-
-        service.add_tags_to_files(conn, [file], ["a[b]"], apply_tagalongs=False)
-        service.remove_tags_from_files(conn, [file], ["zzz"])
-
-        assert _leaf_paths(conn, file) == {("a", "b")}
+        assert _leaf_paths(conn, file) == expected
 
     def test_applies_to_every_file_independently(self, conn, make_file):
         """Two files sharing a branch: removing it should leave each file's
@@ -194,10 +193,10 @@ class TestRemoveTagsFromFiles:
         file1 = make_file("file1.txt")
         file2 = make_file("file2.txt")
 
-        service.add_tags_to_files(conn, [file1], ["x[a],y"], apply_tagalongs=False)
-        service.add_tags_to_files(conn, [file2], ["x[a],z"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file1], _expr("x[a],y"), apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file2], _expr("x[a],z"), apply_tagalongs=False)
 
-        service.remove_tags_from_files(conn, [file1, file2], ["x[a]"])
+        service.remove_tags_from_files(conn, [file1, file2], _expr("x[a]"))
 
         assert _leaf_paths(conn, file1) == {("x",), ("y",)}
         assert _leaf_paths(conn, file2) == {("x",), ("z",)}
@@ -206,17 +205,23 @@ class TestRemoveTagsFromFiles:
 class TestAstToPaths:
     """Root-to-leaf paths only - interior nodes don't get their own entry."""
 
-    def test_single_tag(self):
-        node = parse_for_storage("a")
-        assert service._ast_to_leaf_paths(node) == {("a",)}
-
-    def test_linear_chain_only_yields_the_leaf(self):
-        node = parse_for_storage("a[b[c]]")
-        assert service._ast_to_leaf_paths(node) == {("a", "b", "c")}
-
-    def test_branching_tree_yields_one_path_per_leaf(self):
-        node = parse_for_storage("a[b[c],d]")
-        assert service._ast_to_leaf_paths(node) == {("a", "b", "c"), ("a", "d")}
+    @pytest.mark.parametrize(
+        "tags, expected",
+        [
+            pytest.param("a", {("a",)}, id="single-tag"),
+            pytest.param(
+                "a[b[c]]", {("a", "b", "c")}, id="linear-chain-only-yields-the-leaf"
+            ),
+            pytest.param(
+                "a[b[c],d]",
+                {("a", "b", "c"), ("a", "d")},
+                id="branching-tree-yields-one-path-per-leaf",
+            ),
+        ],
+    )
+    def test_ast_to_leaf_paths(self, tags, expected):
+        node = parse_for_storage(tags)
+        assert service._ast_to_leaf_paths(node) == expected
 
 
 class TestAstToClosure:
@@ -225,34 +230,34 @@ class TestAstToClosure:
     not just leaves.
     """
 
-    def test_single_tag(self):
-        node = parse_for_storage("a")
-        assert service._ast_to_path_closure(node) == {("a",)}
-
-    def test_linear_chain_includes_every_ancestor(self):
-        node = parse_for_storage("a[b[c]]")
-        assert service._ast_to_path_closure(node) == {
-            ("a",),
-            ("a", "b"),
-            ("a", "b", "c"),
-        }
-
-    def test_branching_tree_is_flattened(self):
-        """Regression: an And nested under a Tag used to come back as a
-        nested list instead of a flat set."""
-        node = parse_for_storage("a[b[c],d]")
-        assert service._ast_to_path_closure(node) == {
-            ("a",),
-            ("a", "b"),
-            ("a", "b", "c"),
-            ("a", "d"),
-        }
-
-    def test_top_level_and_is_flattened(self):
-        """Regression: a top-level And (e.g. 'a,b') used to come back as a
-        list of one-element lists instead of a flat set."""
-        node = parse_for_storage("a,b")
-        assert service._ast_to_path_closure(node) == {("a",), ("b",)}
+    @pytest.mark.parametrize(
+        "tags, expected",
+        [
+            pytest.param("a", {("a",)}, id="single-tag"),
+            pytest.param(
+                "a[b[c]]",
+                {("a",), ("a", "b"), ("a", "b", "c")},
+                id="linear-chain-includes-every-ancestor",
+            ),
+            pytest.param(
+                "a[b[c],d]",
+                {("a",), ("a", "b"), ("a", "b", "c"), ("a", "d")},
+                id="branching-tree-is-flattened",
+            ),
+            pytest.param(
+                "a,b",
+                {("a",), ("b",)},
+                id="top-level-and-is-flattened",
+            ),
+        ],
+    )
+    def test_ast_to_path_closure(self, tags, expected):
+        """The `branching-tree-is-flattened` and `top-level-and-is-flattened`
+        cases are regressions: an And nested under a Tag, or at the top
+        level, used to come back as a nested list instead of a flat set.
+        """
+        node = parse_for_storage(tags)
+        assert service._ast_to_path_closure(node) == expected
 
 
 class TestPathsById:
@@ -260,7 +265,7 @@ class TestPathsById:
 
     def test_linear_chain(self, conn, make_file):
         file = make_file()
-        service.add_tags_to_files(conn, [file], ["a[b[c]]"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file], _expr("a[b[c]]"), apply_tagalongs=False)
 
         db_file = crud.file.get_by_path(conn, file)
         assert db_file is not None
@@ -274,7 +279,7 @@ class TestPathsById:
 
     def test_branching_tree(self, conn, make_file):
         file = make_file()
-        service.add_tags_to_files(conn, [file], ["a[b,c]"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file], _expr("a[b,c]"), apply_tagalongs=False)
 
         db_file = crud.file.get_by_path(conn, file)
         assert db_file is not None
@@ -291,8 +296,8 @@ class TestPathsById:
         cross-linked, since set/remove fetch all files' rows in one call."""
         file1 = make_file("file1.txt")
         file2 = make_file("file2.txt")
-        service.add_tags_to_files(conn, [file1], ["a[b]"], apply_tagalongs=False)
-        service.add_tags_to_files(conn, [file2], ["a[c]"], apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file1], _expr("a[b]"), apply_tagalongs=False)
+        service.add_tags_to_files(conn, [file2], _expr("a[c]"), apply_tagalongs=False)
 
         db_files = [crud.file.get_by_path(conn, f) for f in (file1, file2)]
         ids = [f.id for f in db_files if f is not None]
