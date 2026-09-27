@@ -3,7 +3,7 @@ import click
 from tagumori import crud
 from tagumori.commands.common import regex_options
 from tagumori.commands.context import LazyVault
-from tagumori.utils import compile_pattern
+from tagumori.utils import compile_matcher
 
 
 @click.group(help="Tag management")
@@ -104,9 +104,7 @@ def list_tags(
     with vault as conn:
         tags = sorted(crud.tag.get_all(conn), key=lambda x: x.name)
 
-    regex = compile_pattern(pattern, ignore_case)
+    matcher = compile_matcher(pattern, ignore_case, invert_match)
 
-    filtered = [t for t in tags if bool(regex.search(t.name)) ^ invert_match]
-
-    for tag in filtered:
+    for tag in filter(lambda t: matcher(t.name), tags):
         click.echo(tag.name + (f" ({tag.category})" if long else ""))

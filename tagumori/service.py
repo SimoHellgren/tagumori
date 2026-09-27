@@ -8,7 +8,7 @@ from tagumori import crud
 from tagumori.models import File, TaggedFile
 from tagumori.query import search
 from tagumori.query.ast import And, Expr, Not, Tag, and_
-from tagumori.utils import compile_pattern, flatten
+from tagumori.utils import compile_matcher, flatten
 
 
 # utilities for turning the db file_tag structures to AST and paths
@@ -242,10 +242,10 @@ def execute_query(
     else:
         files = crud.file.get_all(conn)
 
-    regex = compile_pattern(pattern, ignore_case)
+    matcher = compile_matcher(pattern, ignore_case, invert_match)
 
     return sorted(
-        (f for f in files if bool(regex.search(str(f.path))) ^ invert_match),
+        filter(lambda f: matcher(str(f.path)), files),
         key=lambda f: f.path,
     )
 
