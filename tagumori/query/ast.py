@@ -220,7 +220,7 @@ class Transformer(StandaloneTransformer):
         return WildcardBounded(max_depth=max_depth, children=children[1])
 
 
-Expr = (
+type Expr = (
     Tag
     | And
     | Or
