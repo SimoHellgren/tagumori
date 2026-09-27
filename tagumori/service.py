@@ -15,8 +15,8 @@ from tagumori.utils import compile_matcher, flatten
 def _db_to_ast(file_tags: Sequence[Row]) -> Expr:
     """Turn db file_tag rows into an AST (with AND)"""
     nodes: dict[int, Tag] = {}
-    children: dict[int, list[Tag]] = defaultdict(list)
-    roots: list[Tag] = []
+    children: dict[int, list[Expr]] = defaultdict(list)
+    roots: list[Expr] = []
 
     for row in file_tags:
         tag = Tag(name=row["name"])

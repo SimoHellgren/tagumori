@@ -42,7 +42,7 @@ class SegmentWildCardBounded:
     max_depth: int
 
 
-Segment = (
+type Segment = (
     SegmentTag | SegmentWildCardSingle | SegmentWildCardPath | SegmentWildCardBounded
 )
 
@@ -89,8 +89,9 @@ def to_query_plan(
             return TagPath(prefix + [SegmentTag(name, is_root=is_root)])
 
         case Tag(name, children):
+            assert children is not None  # for mypy
             is_leaf = isinstance(children, Null)
-            seg = SegmentTag(name, is_root=is_root, is_leaf=is_leaf)
+            seg: Segment = SegmentTag(name, is_root=is_root, is_leaf=is_leaf)
 
             if is_leaf:
                 # if ~ encountered in children, terminate recursion
@@ -103,6 +104,7 @@ def to_query_plan(
             return TagPath(prefix + [SegmentWildCardSingle()])
 
         case WildcardSingle(children):
+            assert children is not None  # for mypy
             is_leaf = isinstance(children, Null)
             seg = SegmentWildCardSingle(is_root=is_root, is_leaf=is_leaf)
 
@@ -127,6 +129,7 @@ def to_query_plan(
             return TagPath(prefix + [SegmentWildCardSingle(is_root=True, is_leaf=True)])
 
         case Null(children):
+            assert children is not None  # for mypy
             # ~[X]: X must be a root
             return to_query_plan(children, prefix, is_root=True)
 
@@ -166,7 +169,7 @@ def simplify(qp: QueryPlan) -> QueryPlan:
 
         case QP_And(operands):
             # simplify children
-            simplified = map(simplify, operands)
+            simplified = list(map(simplify, operands))
 
             # flatten nested: AND(AND(a,b), c) -> AND(a,b,c)
             flattened = []
@@ -184,7 +187,7 @@ def simplify(qp: QueryPlan) -> QueryPlan:
 
         case QP_Or(operands):
             # simplify children
-            simplified = map(simplify, operands)
+            simplified = list(map(simplify, operands))
 
             # flatten nested: OR(OR(a,b), c) -> OR(a,b,c)
             flattened = []
