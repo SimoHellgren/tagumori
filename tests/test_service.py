@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from tagumori import crud, service
-from tagumori.query import _string_to_ast, parse_for_storage
+from tagumori.query import parse, parse_for_storage
 from tagumori.query.ast import Expr
 
 
@@ -16,7 +16,7 @@ def _leaf_paths(conn, file: Path) -> set[tuple[str, ...]]:
 
 
 def _expr(string: str) -> Expr:
-    return _string_to_ast(string)
+    return parse(string)
 
 
 class TestSearchFiles:
@@ -146,10 +146,14 @@ class TestSetTagsOnFiles:
         file1 = make_file("file1.txt")
         file2 = make_file("file2.txt")
 
-        service.add_tags_to_files(conn, [file1], _expr("a[b[c]]"), apply_tagalongs=False)
+        service.add_tags_to_files(
+            conn, [file1], _expr("a[b[c]]"), apply_tagalongs=False
+        )
         service.add_tags_to_files(conn, [file2], _expr("q"), apply_tagalongs=False)
 
-        service.set_tags_on_files(conn, [file1, file2], _expr("x[a]"), apply_tagalongs=False)
+        service.set_tags_on_files(
+            conn, [file1, file2], _expr("x[a]"), apply_tagalongs=False
+        )
 
         assert _leaf_paths(conn, file1) == {("x", "a")}
         assert _leaf_paths(conn, file2) == {("x", "a")}

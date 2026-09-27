@@ -1,5 +1,5 @@
 from tagumori import crud
-from tagumori.query import _string_to_ast
+from tagumori.query import parse
 from tagumori.query import search as _search
 from tagumori.query.executor import execute as _execute
 from tagumori.query.executor import find_all
@@ -25,7 +25,7 @@ def search(conn, string, case=True):
     the universe separately every time. Also parses string to AST as
     a convenience.
     """
-    expr = _string_to_ast(string)
+    expr = parse(string)
 
     return _search(conn, expr, lambda: get_all_ids(conn), case)
 

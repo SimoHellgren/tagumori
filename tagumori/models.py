@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlite3 import Row
 from typing import Self
 
-from tagumori.query import _string_to_ast
+from tagumori.query import parse
 from tagumori.query.ast import Expr, or_
 
 
@@ -78,8 +78,8 @@ class Query(RowModel):
         select_array = json.loads(row["select_tags"] or "[]")
         exclude_array = json.loads(row["exclude_tags"] or "[]")
 
-        selects = or_(*map(_string_to_ast, select_array))
-        excludes = or_(*map(_string_to_ast, exclude_array))
+        selects = or_(*map(parse, select_array))
+        excludes = or_(*map(parse, exclude_array))
 
         return cls(
             id=row["id"],

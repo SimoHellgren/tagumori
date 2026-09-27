@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from tagumori.query import _string_to_ast
+from tagumori.query import parse
 from tagumori.query.ast import Expr, and_, or_, validate_for_storage
 
 
@@ -14,7 +14,7 @@ class TagQuery(click.ParamType):
 
     def convert(self, value, param, ctx):
 
-        return _string_to_ast(value)
+        return parse(value)
 
 
 class TagTree(TagQuery):
