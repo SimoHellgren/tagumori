@@ -17,6 +17,9 @@ class TagQuery(click.ParamType):
         return parse(value)
 
 
+TAGQUERY = TagQuery()
+
+
 class TagTree(TagQuery):
     name = "tag tree"
 
@@ -32,6 +35,9 @@ class TagTree(TagQuery):
             )
 
         return parsed
+
+
+TAGTREE = TagTree()
 
 
 def tag_tree_callback(ctx, param, value) -> Expr:
@@ -51,14 +57,10 @@ def query_callback(ctx, param, value) -> Expr | None:
 
 def query_options(func):
     func = click.option(
-        "-s", "--select", multiple=True, type=TagQuery(), callback=query_callback
+        "-s", "--select", multiple=True, type=TAGQUERY, callback=query_callback
     )(func)
     func = click.option(
-        "-e",
-        "--exclude",
-        multiple=True,
-        type=TagQuery(),
-        callback=query_callback,
+        "-e", "--exclude", multiple=True, type=TAGQUERY, callback=query_callback
     )(func)
     func = click.option(
         "-I", "--ignore-tag-case", is_flag=True, help="Ignore tag case."

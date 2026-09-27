@@ -6,7 +6,7 @@ import click
 from tagumori import service
 from tagumori.commands import db, file, query, review, tag, tagalong
 from tagumori.commands.common import (
-    TagTree,
+    TAGTREE,
     file_print_options,
     query_options,
     regex_options,
@@ -51,7 +51,7 @@ cli.add_command(review.review)
     "-t",
     "tags",
     required=True,
-    type=TagTree(),
+    type=TAGTREE,
     multiple=True,
     callback=tag_tree_callback,
 )
@@ -84,7 +84,7 @@ def add(
     "-t",
     "tags",
     required=True,
-    type=TagTree(),
+    type=TAGTREE,
     multiple=True,
     callback=tag_tree_callback,
 )
@@ -106,7 +106,7 @@ def remove(vault: LazyVault, files: Sequence[Path], tags: Expr):
     "-t",
     "tags",
     required=True,
-    type=TagTree(),
+    type=TAGTREE,
     multiple=True,
     callback=tag_tree_callback,
 )
