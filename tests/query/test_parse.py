@@ -1,6 +1,6 @@
 import pytest
 
-from tagumori.query import _string_to_ast, parse_for_storage
+from tagumori.query import parse, parse_for_storage
 from tagumori.query.ast import (
     And,
     Not,
@@ -17,104 +17,102 @@ from tagumori.query.ast import (
 
 class TestParseSingleTag:
     def test_simple_name(self):
-        assert _string_to_ast("rock") == Tag("rock")
+        assert parse("rock") == Tag("rock")
 
     def test_name_with_spaces(self):
-        assert _string_to_ast("Will Smith") == Tag("Will Smith")
+        assert parse("Will Smith") == Tag("Will Smith")
 
     def test_unicode_name(self):
-        assert _string_to_ast("日本語") == Tag("日本語")
+        assert parse("日本語") == Tag("日本語")
 
     def test_name_with_hyphens_and_underscores(self):
-        assert _string_to_ast("foo-bar_baz") == Tag("foo-bar_baz")
+        assert parse("foo-bar_baz") == Tag("foo-bar_baz")
 
     def test_xor_as_tag_name(self):
-        assert _string_to_ast("xor") == Tag("xor")
+        assert parse("xor") == Tag("xor")
 
     def test_leading_trailing_whitespace_trimmed(self):
-        assert _string_to_ast("  rock  ") == Tag("rock")
+        assert parse("  rock  ") == Tag("rock")
 
 
 class TestParseBrackets:
     def test_tag_with_child(self):
-        assert _string_to_ast("genre[rock]") == Tag("genre", Tag("rock"))
+        assert parse("genre[rock]") == Tag("genre", Tag("rock"))
 
     def test_nested_two_levels(self):
-        assert _string_to_ast("a[b[c]]") == Tag("a", Tag("b", Tag("c")))
+        assert parse("a[b[c]]") == Tag("a", Tag("b", Tag("c")))
 
     def test_bracket_with_and(self):
-        assert _string_to_ast("genre[rock,jazz]") == Tag(
+        assert parse("genre[rock,jazz]") == Tag(
             "genre", And([Tag("rock"), Tag("jazz")])
         )
 
     def test_bracket_with_or(self):
-        assert _string_to_ast("genre[rock|jazz]") == Tag(
-            "genre", Or([Tag("rock"), Tag("jazz")])
-        )
+        assert parse("genre[rock|jazz]") == Tag("genre", Or([Tag("rock"), Tag("jazz")]))
 
     def test_bracket_with_not(self):
-        assert _string_to_ast("a[!b]") == Tag("a", Not(Tag("b")))
+        assert parse("a[!b]") == Tag("a", Not(Tag("b")))
 
 
 class TestParseOperators:
     def test_and(self):
-        assert _string_to_ast("a,b") == And([Tag("a"), Tag("b")])
+        assert parse("a,b") == And([Tag("a"), Tag("b")])
 
     def test_or(self):
-        assert _string_to_ast("a|b") == Or([Tag("a"), Tag("b")])
+        assert parse("a|b") == Or([Tag("a"), Tag("b")])
 
     def test_xor(self):
-        assert _string_to_ast("a^b") == Xor([Tag("a"), Tag("b")])
+        assert parse("a^b") == Xor([Tag("a"), Tag("b")])
 
     def test_not(self):
-        assert _string_to_ast("!a") == Not(Tag("a"))
+        assert parse("!a") == Not(Tag("a"))
 
     def test_only_one_two_args(self):
-        assert _string_to_ast("xor(a,b)") == OnlyOne([Tag("a"), Tag("b")])
+        assert parse("xor(a,b)") == OnlyOne([Tag("a"), Tag("b")])
 
     def test_only_one_three_args(self):
-        assert _string_to_ast("xor(a,b,c)") == OnlyOne([Tag("a"), Tag("b"), Tag("c")])
+        assert parse("xor(a,b,c)") == OnlyOne([Tag("a"), Tag("b"), Tag("c")])
 
 
 class TestParsePrecedence:
     def test_not_binds_tighter_than_and(self):
         # !a,b -> AND(NOT(a), b)
-        assert _string_to_ast("!a,b") == And([Not(Tag("a")), Tag("b")])
+        assert parse("!a,b") == And([Not(Tag("a")), Tag("b")])
 
     def test_and_binds_tighter_than_or(self):
         # a,b|c -> OR(AND(a,b), c)
-        assert _string_to_ast("a,b|c") == Or([And([Tag("a"), Tag("b")]), Tag("c")])
+        assert parse("a,b|c") == Or([And([Tag("a"), Tag("b")]), Tag("c")])
 
     def test_or_binds_tighter_than_xor(self):
         # a|b^c -> XOR(OR(a,b), c)
-        assert _string_to_ast("a|b^c") == Xor([Or([Tag("a"), Tag("b")]), Tag("c")])
+        assert parse("a|b^c") == Xor([Or([Tag("a"), Tag("b")]), Tag("c")])
 
     def test_parens_override_precedence(self):
         # a,(b|c) -> AND(a, OR(b,c))
-        assert _string_to_ast("a,(b|c)") == And([Tag("a"), Or([Tag("b"), Tag("c")])])
+        assert parse("a,(b|c)") == And([Tag("a"), Or([Tag("b"), Tag("c")])])
 
     def test_double_negation_preserved(self):
-        assert _string_to_ast("!!a") == Not(Not(Tag("a")))
+        assert parse("!!a") == Not(Not(Tag("a")))
 
 
 class TestParseWildcards:
     def test_null_bare(self):
-        assert _string_to_ast("~") == Null()
+        assert parse("~") == Null()
 
     def test_null_with_child(self):
-        assert _string_to_ast("~[a]") == Null(Tag("a"))
+        assert parse("~[a]") == Null(Tag("a"))
 
     def test_wildcard_single_bare(self):
-        assert _string_to_ast("*") == WildcardSingle()
+        assert parse("*") == WildcardSingle()
 
     def test_wildcard_single_with_child(self):
-        assert _string_to_ast("*[a]") == WildcardSingle(Tag("a"))
+        assert parse("*[a]") == WildcardSingle(Tag("a"))
 
     def test_wildcard_path(self):
-        assert _string_to_ast("**") == WildcardPath()
+        assert parse("**") == WildcardPath()
 
     def test_wildcard_bounded(self):
-        assert _string_to_ast("*3*") == WildcardBounded(3)
+        assert parse("*3*") == WildcardBounded(3)
 
 
 class TestParseForStorage:
@@ -151,4 +149,4 @@ class TestAstStr:
     )
     def test_roundtrip(self, ast, expected_str):
         assert str(ast) == expected_str
-        assert _string_to_ast(str(ast)) == ast
+        assert parse(str(ast)) == ast

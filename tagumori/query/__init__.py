@@ -7,7 +7,7 @@ from tagumori.query.parser import Lark_StandAlone
 from tagumori.query.planner import simplify, to_query_plan
 
 
-def _string_to_ast(string: str) -> Expr:
+def parse(string: str) -> Expr:
     parser = Lark_StandAlone(transformer=Transformer())
     ast = parser.parse(string)
     return ast
@@ -15,17 +15,16 @@ def _string_to_ast(string: str) -> Expr:
 
 def search(
     conn: Connection,
-    string: str,
+    query_expr: Expr,
     get_all_ids: Callable[[], set[int]],
     case: bool = True,
 ) -> set[int]:
-    ast = _string_to_ast(string)
-    query_plan = simplify(to_query_plan(ast))
+    query_plan = simplify(to_query_plan(query_expr))
     return execute(conn, query_plan, get_all_ids, case)
 
 
 def parse_for_storage(string: str) -> Expr:
-    ast = _string_to_ast(string)
+    ast = parse(string)
 
     if not validate_for_storage(ast):
         raise ValueError(

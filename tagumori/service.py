@@ -6,8 +6,8 @@ from sqlite3 import Connection, Row
 
 from tagumori import crud
 from tagumori.models import File, TaggedFile
-from tagumori.query import parse_for_storage, search
-from tagumori.query.ast import And, Expr, Tag
+from tagumori.query import search
+from tagumori.query.ast import And, Expr, Not, Tag, and_
 from tagumori.utils import compile_pattern
 
 flatten = chain.from_iterable
@@ -118,16 +118,13 @@ def attach_tree(
 def add_tags_to_files(
     conn: Connection,
     files: Sequence[Path],
-    tags: Sequence[str],
+    tags: Expr,
     apply_tagalongs: bool = True,
 ):
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
 
-    tag_expr = ",".join(tags)
-    node = parse_for_storage(tag_expr)
-
     for file_id in file_ids:
-        attach_tree(conn, file_id, node)
+        attach_tree(conn, file_id, tags)
 
     if apply_tagalongs:
         crud.tagalong.apply(
@@ -136,14 +133,10 @@ def add_tags_to_files(
         )
 
 
-def remove_tags_from_files(
-    conn: Connection, files: Sequence[Path], tags: Sequence[str]
-):
-    tag_expr = ",".join(tags)
-    node = parse_for_storage(tag_expr)
+def remove_tags_from_files(conn: Connection, files: Sequence[Path], tags: Expr):
 
     # remove only leafs
-    unwanted = set(_ast_to_leaf_paths(node))
+    unwanted = set(_ast_to_leaf_paths(tags))
 
     # fetch files and their tags
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
@@ -159,14 +152,11 @@ def remove_tags_from_files(
 def set_tags_on_files(
     conn: Connection,
     files: Sequence[Path],
-    tags: Sequence[str],
+    tags: Expr,
     apply_tagalongs: bool = True,
 ):
-    tag_expr = ",".join(tags)
-    node = parse_for_storage(tag_expr)
-
     # get closure of tags/paths to retain
-    keep = _ast_to_path_closure(node)
+    keep = _ast_to_path_closure(tags)
 
     # fetch files and their tags
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
@@ -209,8 +199,8 @@ def lookup_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
 
 def list_files(
     conn: Connection,
-    select: Sequence[str],
-    exclude: Sequence[str],
+    select: Expr | None,
+    exclude: Expr | None,
     ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,
@@ -231,29 +221,22 @@ def list_files(
 
 def execute_query(
     conn: Connection,
-    select_strs: Sequence[str],
-    exclude_strs: Sequence[str],
+    select: Expr | None,
+    exclude: Expr | None,
     ignore_tag_case: bool = False,
     pattern: str = ".*",
     ignore_case: bool = False,
     invert_match: bool = False,
 ) -> list[File]:
 
-    query_parts = []
+    negated_exclude = Not(exclude) if exclude is not None else None
+    query_expr = and_(*[x for x in [select, negated_exclude] if x is not None])
 
-    if select_strs:
-        query_parts.append("|".join(select_strs))
-
-    if exclude_strs:
-        query_parts.append("|".join(f"!{e}" for e in exclude_strs))
-
-    query_str = ",".join(query_parts)
-
-    if query_str:
+    if query_expr:
         # pass lambdafunc to let dependent funcs to get file ids lazily
         ids = search(
             conn,
-            query_str,
+            query_expr,
             lambda: {x.id for x in crud.file.get_all(conn)},
             not ignore_tag_case,
         )

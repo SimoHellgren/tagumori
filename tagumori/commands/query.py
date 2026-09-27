@@ -8,6 +8,7 @@ from tagumori import crud, service
 from tagumori.commands.common import file_print_options, query_options, regex_options
 from tagumori.commands.context import LazyVault
 from tagumori.models import Query
+from tagumori.query.ast import Expr
 from tagumori.render import format_file_output
 
 
@@ -31,37 +32,35 @@ def query(vault: LazyVault):
 def save(
     vault: LazyVault,
     name: str,
-    select: tuple[str, ...],
-    exclude: tuple[str, ...],
+    select: Expr | None,
+    exclude: Expr | None,
     ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,
     invert_match: bool,
     force: bool,
 ):
-    import json
-
-    data = {
-        "name": name,
-        "select_tags": json.dumps(list(select)),
-        "exclude_tags": json.dumps(list(exclude)),
-        "ignore_tag_case": ignore_tag_case,
-        "pattern": pattern,
-        "ignore_case": ignore_case,
-        "invert_match": invert_match,
-    }
-
     with vault as conn:
-        if force:
-            crud.query.upsert(conn, **data)
+        if not force and crud.query.get_by_name(conn, name):
+            raise click.ClickException(
+                f"Query '{name}' already exists. Run with --force to overwrite."
+            )
 
-        else:
-            # check if exists
-            if crud.query.get_by_name(conn, name):
-                raise click.ClickException(
-                    f"Query '{name}' already exists. Run with --force to overwrite."
-                )
-            crud.query.create(conn, **data)
+        import json
+
+        selects = [str(select)] if select else []
+        excludes = [str(exclude)] if exclude else []
+
+        crud.query.upsert(
+            conn,
+            name=name,
+            select_tags=json.dumps(selects),
+            exclude_tags=json.dumps(excludes),
+            ignore_tag_case=ignore_tag_case,
+            pattern=pattern,
+            ignore_case=ignore_case,
+            invert_match=invert_match,
+        )
 
 
 @query.command(help="Run saved queries")
@@ -130,8 +129,8 @@ def run(
 
 def ls_long_format(data: Query):
 
-    selects = " ".join(f"-s {x}" for x in data.select_tags)
-    excludes = " ".join(f"-e {x}" for x in data.exclude_tags)
+    selects = f"-s {x}" if (x := data.select_tags) else ""
+    excludes = f"-e {x}" if (x := data.exclude_tags) else ""
 
     flag_map = [
         ("-I", data.ignore_tag_case),

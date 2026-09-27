@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from dataclasses import dataclass
 
 from tagumori.query.parser import Transformer as StandaloneTransformer
@@ -23,7 +22,7 @@ class Xor:
     operands: list["Expr"]
 
     def __str__(self) -> str:
-        return "^".join(str(op) for op in self.operands)
+        return "^".join(_wrap(self, op) for op in self.operands)
 
 
 @dataclass
@@ -33,16 +32,16 @@ class OnlyOne:
     operands: list["Expr"]
 
     def __str__(self) -> str:
-        ops = ",".join(str(op) for op in self.operands)
+        ops = ",".join(_wrap(self, op) for op in self.operands)
         return f"xor({ops})"
 
 
 @dataclass
 class And:
-    operands: Sequence["Expr"]
+    operands: list["Expr"]
 
     def __str__(self) -> str:
-        return ",".join(str(op) for op in self.operands)
+        return ",".join(_wrap(self, op) for op in self.operands)
 
 
 @dataclass
@@ -50,7 +49,7 @@ class Or:
     operands: list["Expr"]
 
     def __str__(self) -> str:
-        return "|".join(str(op) for op in self.operands)
+        return "|".join(_wrap(self, op) for op in self.operands)
 
 
 @dataclass
@@ -58,7 +57,7 @@ class Not:
     operand: "Expr"
 
     def __str__(self) -> str:
-        return f"!{self.operand}"
+        return f"!{_wrap(self, self.operand)}"
 
 
 @dataclass
@@ -104,6 +103,33 @@ class WildcardBounded:
             return f"*{self.max_depth}*"
 
         return f"*{self.max_depth}*[{self.children}]"
+
+
+def precedence(expr: "Expr") -> int:
+    match expr:
+        case Xor():
+            return 0
+
+        case Or():
+            return 1
+
+        case And():
+            return 2
+
+        case Not():
+            return 3
+
+        case _:
+            return 4
+
+
+def _wrap(parent: "Expr", operand: "Expr") -> str:
+    rendered = str(operand)
+
+    if precedence(operand) < precedence(parent):
+        return f"({rendered})"
+
+    return rendered
 
 
 class Transformer(StandaloneTransformer):
@@ -194,7 +220,7 @@ class Transformer(StandaloneTransformer):
         return WildcardBounded(max_depth=max_depth, children=children[1])
 
 
-Expr = (
+type Expr = (
     Tag
     | And
     | Or
@@ -226,3 +252,32 @@ def validate_for_storage(node: Expr) -> bool:
 
         case _:
             return False
+
+
+def and_(*operands: Expr) -> Expr | None:
+    """A 'smart' constuctor for And:
+    Wraps operands in And if necessary
+    """
+    if not operands:
+        return None
+
+    if len(operands) == 1:
+        return operands[0]
+
+    # explicit `list` for type correctness
+    return And(list(operands))
+
+
+def or_(*operands: Expr) -> Expr | None:
+    """A 'smart' constuctor for Or:
+    Wraps operands in Or if necessary
+    """
+
+    if not operands:
+        return None
+
+    if len(operands) == 1:
+        return operands[0]
+
+    # explicit `list` for type correctness
+    return Or(list(operands))

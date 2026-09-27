@@ -5,8 +5,15 @@ import click
 
 from tagumori import service
 from tagumori.commands import db, file, query, review, tag, tagalong
-from tagumori.commands.common import file_print_options, query_options, regex_options
+from tagumori.commands.common import (
+    TagTree,
+    file_print_options,
+    query_options,
+    regex_options,
+    tag_tree_callback,
+)
 from tagumori.commands.context import LazyVault
+from tagumori.query.ast import Expr
 from tagumori.render import format_file_output
 
 DEFAULT_VAULT_PATH = Path("./vault.db")
@@ -40,7 +47,14 @@ cli.add_command(review.review)
     type=click.Path(path_type=Path, exists=True),
     multiple=True,
 )
-@click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
+@click.option(
+    "-t",
+    "tags",
+    required=True,
+    type=TagTree(),
+    multiple=True,
+    callback=tag_tree_callback,
+)
 @click.option(
     "--tagalongs/--no-tagalongs",
     type=click.BOOL,
@@ -51,7 +65,7 @@ cli.add_command(review.review)
 def add(
     vault: LazyVault,
     files: Sequence[Path],
-    tags: Sequence[str],
+    tags: Expr,
     tagalongs: bool,
 ):
     with vault as conn:
@@ -66,9 +80,16 @@ def add(
     type=click.Path(path_type=Path, exists=True),
     multiple=True,
 )
-@click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
+@click.option(
+    "-t",
+    "tags",
+    required=True,
+    type=TagTree(),
+    multiple=True,
+    callback=tag_tree_callback,
+)
 @click.pass_obj
-def remove(vault: LazyVault, files: Sequence[Path], tags: Sequence[str]):
+def remove(vault: LazyVault, files: Sequence[Path], tags: Expr):
     with vault as conn:
         service.remove_tags_from_files(conn, files, tags)
 
@@ -81,7 +102,14 @@ def remove(vault: LazyVault, files: Sequence[Path], tags: Sequence[str]):
     type=click.Path(path_type=Path, exists=True),
     multiple=True,
 )
-@click.option("-t", "tags", required=True, type=click.STRING, multiple=True)
+@click.option(
+    "-t",
+    "tags",
+    required=True,
+    type=TagTree(),
+    multiple=True,
+    callback=tag_tree_callback,
+)
 @click.option(
     "--tagalongs/--no-tagalongs",
     type=click.BOOL,
@@ -89,7 +117,7 @@ def remove(vault: LazyVault, files: Sequence[Path], tags: Sequence[str]):
     help="Apply / don't apply tagalongs.",
 )
 @click.pass_obj
-def set_(vault: LazyVault, files: Sequence[Path], tags: Sequence[str], tagalongs: bool):
+def set_(vault: LazyVault, files: Sequence[Path], tags: Expr, tagalongs: bool):
 
     with vault as conn:
         service.set_tags_on_files(conn, files, tags, tagalongs)
@@ -118,8 +146,8 @@ def drop(vault: LazyVault, files: Sequence[Path], retain_file: bool):
 def ls(
     vault: LazyVault,
     long: bool,
-    select: Sequence[str],
-    exclude: Sequence[str],
+    select: Expr | None,
+    exclude: Expr | None,
     ignore_tag_case: bool,
     pattern: str,
     ignore_case: bool,
