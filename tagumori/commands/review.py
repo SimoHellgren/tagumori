@@ -38,7 +38,7 @@ class ReviewSession:
 
     def goto(self, index: int) -> None:
         if not 0 <= index <= len(self.items) - 1:
-            print("Index not in range")
+            click.echo("Index not in range")
             return
 
         self.index = index
@@ -48,7 +48,7 @@ class ReviewSession:
             file = crud.file.get_by_path(conn, self.current)
 
             if not file:
-                print("File not in vault")
+                click.echo("File not in vault")
                 return
 
             tagged_file = service.lookup_tags(conn, [file])
@@ -144,7 +144,7 @@ class REPL(cmd.Cmd):
         try:
             position = int(arg)
         except ValueError:
-            print(f"'{arg}' is not an integer")
+            click.echo(f"'{arg}' is not an integer")
             return
 
         self.session.goto(position - 1)
@@ -167,7 +167,7 @@ class REPL(cmd.Cmd):
 
     def do_EOF(self, arg):
         """Exit the REPL"""
-        print()
+        click.echo()
         return True
 
     def do_add(self, arg):
@@ -175,9 +175,9 @@ class REPL(cmd.Cmd):
 
         try:
             self.session.add_tags(tag_expr)
-            print(f"Added: {tag_expr}")
+            click.echo(f"Added: {tag_expr}")
         except (ValueError, UnexpectedToken, UnexpectedCharacters) as e:
-            print(e)
+            click.echo(e)
 
     def do_info(self, arg):
         self.session.file_info()
