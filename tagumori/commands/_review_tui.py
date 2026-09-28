@@ -107,11 +107,19 @@ class REPL(cmd.Cmd):
         return True
 
     def do_add(self, arg):
-        tag_expr = self.tag_session.prompt("Add tags: ", completer=self.tag_completer)
+        try:
+            tag_expr = self.tag_session.prompt(
+                "Add tags: ", completer=self.tag_completer
+            )
+
+        except (EOFError, KeyboardInterrupt):
+            click.echo("Canceled.")
+            return
 
         try:
             self.session.add_tags(tag_expr)
             click.echo(f"Added: {tag_expr}")
+
         except (ValueError, UnexpectedToken, UnexpectedCharacters) as e:
             click.echo(e)
 
