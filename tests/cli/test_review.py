@@ -3,9 +3,11 @@ import pytest
 from prompt_toolkit.document import Document
 
 from tagumori import crud, service
+from tagumori.commands import _review_tui as review_tui_module
 from tagumori.commands import review as review_module
+from tagumori.commands._review_tui import REPL, TagCompleter
 from tagumori.commands.context import LazyVault
-from tagumori.commands.review import REPL, ReviewSession, TagCompleter
+from tagumori.commands.review import ReviewSession
 from tagumori.query.parser import UnexpectedToken
 
 
@@ -52,7 +54,7 @@ def prompts(monkeypatch) -> ScriptedPrompts:
                 raise EOFError
             return scripted.answers.pop(0)
 
-    monkeypatch.setattr(review_module, "PromptSession", StubPromptSession)
+    monkeypatch.setattr(review_tui_module, "PromptSession", StubPromptSession)
     monkeypatch.setattr(review_module, "_stdio_has_tty", lambda: True)
     return scripted
 
