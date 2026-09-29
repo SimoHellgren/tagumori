@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlite3 import Connection, Row
 
 from tagumori import crud
-from tagumori.models import File, TaggedFile
+from tagumori.models import File, TagalongNames, TaggedFile
 from tagumori.query import search
 from tagumori.query.ast import And, Expr, Not, Tag, and_
 from tagumori.utils import compile_matcher, flatten
@@ -269,3 +269,17 @@ def relocate_file(conn: Connection, file: File, search_root: Path) -> None:
 
         if stat.st_ino == target_inode and stat.st_dev == target_device:
             crud.file.update(conn, file.id, path, stat.st_ino, stat.st_dev)
+
+
+def list_tagalong_names(conn: Connection) -> list[TagalongNames]:
+    result = conn.execute("""
+        SELECT
+            t.name tag_name, 
+            ta.name tagalong_name
+        FROM tagalong
+        JOIN tag t on tagalong.tag_id = t.id
+        JOIN tag ta on tagalong.tagalong_id = ta.id
+        ORDER BY t.name, ta.name
+        """).fetchall()
+
+    return [TagalongNames(row["tag_name"], row["tagalong_name"]) for row in result]

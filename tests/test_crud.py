@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+import tagumori.service
 from tagumori import crud
 from tagumori.crud.file import _get_inode_and_device
 from tests.helpers import not_none
@@ -416,10 +417,10 @@ class TestTagalong:
 
         crud.tagalong.create(conn, source_id, target_id)
 
-        rows = crud.tagalong.get_all_names(conn)
+        rows = tagumori.service.list_tagalong_names(conn)
         assert len(rows) == 1
-        assert rows[0][0] == "rock"
-        assert rows[0][1] == "guitar"
+        assert rows[0].tag_name == "rock"
+        assert rows[0].tagalong_name == "guitar"
 
     def test_create_idempotent(self, conn, two_tags):
         source_id, target_id = two_tags
@@ -427,7 +428,7 @@ class TestTagalong:
         crud.tagalong.create(conn, source_id, target_id)
         crud.tagalong.create(conn, source_id, target_id)
 
-        rows = crud.tagalong.get_all_names(conn)
+        rows = tagumori.service.list_tagalong_names(conn)
         assert len(rows) == 1
 
     def test_delete(self, conn, two_tags):
@@ -436,7 +437,7 @@ class TestTagalong:
 
         crud.tagalong.delete(conn, source_id, target_id)
 
-        rows = crud.tagalong.get_all_names(conn)
+        rows = tagumori.service.list_tagalong_names(conn)
         assert rows == []
 
     def test_apply(self, conn, two_tags):
@@ -537,7 +538,7 @@ class TestCascadeDeletes:
 
         crud.tag.delete(conn, t1.id)
 
-        rows = crud.tagalong.get_all_names(conn)
+        rows = tagumori.service.list_tagalong_names(conn)
         assert rows == []
 
     @pytest.mark.parametrize(

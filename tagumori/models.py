@@ -101,3 +101,9 @@ class TaggedFile:
     @property
     def path(self) -> Path:
         return self.file.path
+
+
+@dataclass
+class TagalongNames:
+    tag_name: str
+    tagalong_name: str
