@@ -1,17 +1,15 @@
 from collections.abc import Sequence
 from sqlite3 import Connection, Row
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from tagumori.models import RowModel
-
-T = TypeVar("T", bound=RowModel)
 
 
 def _placeholders(count: int, placeholder: str = "?"):
     return ",".join(placeholder for _ in range(count))
 
 
-class BaseCRUD(Generic[T]):
+class BaseCRUD[T: RowModel]:
     """A Baseclass with implementations of the most common shared logic."""
 
     def __init__(self, table: str, unique_col: str, model: type[T]):
