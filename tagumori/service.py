@@ -137,6 +137,26 @@ def add_tags_to_files(
         )
 
 
+def get_file_tag_nodes(conn: Connection, file_ids: list[int]) -> list[FileTagNode]:
+    if not file_ids:
+        return []
+
+    placeholders = ",".join("?" for _ in file_ids)
+    q = f"""
+        SELECT
+            file_tag.file_id,
+            file_tag.id,
+            tag.name tag_name,
+            file_tag.parent_id
+        FROM file_tag
+        JOIN tag
+            on tag.id = file_tag.tag_id
+        WHERE file_tag.file_id IN ({placeholders})
+        ORDER BY file_id, parent_id, name
+    """
+    return [FileTagNode(**row) for row in conn.execute(q, file_ids).fetchall()]
+
+
 def remove_tags_from_files(conn: Connection, files: Sequence[Path], tags: Expr):
 
     # remove only leafs
@@ -144,7 +164,7 @@ def remove_tags_from_files(conn: Connection, files: Sequence[Path], tags: Expr):
 
     # fetch files and their tags
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
-    db_tags = crud.file_tag.get_by_file_ids(conn, file_ids)
+    db_tags = get_file_tag_nodes(conn, file_ids)
 
     existing_paths = _paths_by_id(db_tags)
 
@@ -164,7 +184,7 @@ def set_tags_on_files(
 
     # fetch files and their tags
     file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
-    db_tags = crud.file_tag.get_by_file_ids(conn, file_ids)
+    db_tags = get_file_tag_nodes(conn, file_ids)
 
     # materialized path to every node, keyed by file_tag id
     existing_paths = _paths_by_id(db_tags)
@@ -193,7 +213,7 @@ def drop_file_tags(conn: Connection, files: Sequence[Path], retain_file: bool = 
 
 def lookup_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
     ids = [file.id for file in files]
-    tags = crud.file_tag.get_by_file_ids(conn, ids)
+    tags = get_file_tag_nodes(conn, ids)
 
     # tags are ordered by file id so we can groupby safely
     lookup = {k: list(v) for k, v in groupby(tags, key=lambda x: x.file_id)}

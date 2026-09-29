@@ -1,27 +1,5 @@
 from sqlite3 import Connection
 
-from tagumori.models import FileTagNode
-
-
-def get_by_file_ids(conn: Connection, file_ids: list[int]) -> list[FileTagNode]:
-    if not file_ids:
-        return []
-
-    placeholders = ",".join("?" for _ in file_ids)
-    q = f"""
-        SELECT
-            file_tag.file_id,
-            file_tag.id,
-            tag.name tag_name,
-            file_tag.parent_id
-        FROM file_tag
-        JOIN tag
-            on tag.id = file_tag.tag_id
-        WHERE file_tag.file_id IN ({placeholders})
-        ORDER BY file_id, parent_id, name
-    """
-    return [FileTagNode(**row) for row in conn.execute(q, file_ids).fetchall()]
-
 
 def replace(conn: Connection, old_id: int, new_id: int) -> None:
     conn.execute("UPDATE file_tag SET tag_id = ? where tag_id = ?", (new_id, old_id))

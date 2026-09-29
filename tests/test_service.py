@@ -11,7 +11,7 @@ def _leaf_paths(conn, file: Path) -> set[tuple[str, ...]]:
     """The resulting leaf paths for a file's tags, for asserting exact tag state."""
     db_file = crud.file.get_by_path(conn, file)
     assert db_file is not None
-    rows = crud.file_tag.get_by_file_ids(conn, [db_file.id])
+    rows = service.get_file_tag_nodes(conn, [db_file.id])
     return service._db_tags_to_leaf_paths(rows)
 
 
@@ -273,7 +273,7 @@ class TestPathsById:
 
         db_file = crud.file.get_by_path(conn, file)
         assert db_file is not None
-        rows = crud.file_tag.get_by_file_ids(conn, [db_file.id])
+        rows = service.get_file_tag_nodes(conn, [db_file.id])
 
         assert set(service._paths_by_id(rows).values()) == {
             ("a",),
@@ -287,7 +287,7 @@ class TestPathsById:
 
         db_file = crud.file.get_by_path(conn, file)
         assert db_file is not None
-        rows = crud.file_tag.get_by_file_ids(conn, [db_file.id])
+        rows = service.get_file_tag_nodes(conn, [db_file.id])
 
         assert set(service._paths_by_id(rows).values()) == {
             ("a",),
@@ -305,10 +305,67 @@ class TestPathsById:
 
         db_files = [crud.file.get_by_path(conn, f) for f in (file1, file2)]
         ids = [f.id for f in db_files if f is not None]
-        rows = crud.file_tag.get_by_file_ids(conn, ids)
+        rows = service.get_file_tag_nodes(conn, ids)
 
         assert set(service._paths_by_id(rows).values()) == {
             ("a",),
             ("a", "b"),
             ("a", "c"),
         }
+
+
+class TestGetFileTagNodes:
+    def test_multiple_files(self, conn, make_tagged_file):
+        file1_id = make_tagged_file("a.txt", [("rock",)])
+        file2_id = make_tagged_file("b.txt", [("jazz",)])
+
+        rows = service.get_file_tag_nodes(conn, [file1_id, file2_id])
+
+        assert len(rows) == 2
+        names = {row.tag_name for row in rows}
+        assert names == {"rock", "jazz"}
+
+    def test_results_include_file_id(self, conn, make_tagged_file):
+        file1_id = make_tagged_file("a.txt", [("rock",)])
+        file2_id = make_tagged_file("b.txt", [("rock",)])
+
+        rows = service.get_file_tag_nodes(conn, [file1_id, file2_id])
+
+        returned_file_ids = {row.file_id for row in rows}
+        assert returned_file_ids == {file1_id, file2_id}
+
+    def test_ordered_by_file_id_parent_id_name(self, conn, make_tagged_file):
+        # Create file1 first so it gets the lower file_id, but attach file2's
+        # tags first - proves ordering is by file_id, not attachment order.
+        file1_id = crud.file.get_or_create(conn, Path("a.txt")).id
+        file2_id = make_tagged_file("b.txt", [("jazz",), ("blues",)])
+        make_tagged_file("a.txt", [("rock",)])
+
+        rows = service.get_file_tag_nodes(conn, [file1_id, file2_id])
+
+        # file1 results should come before file2 (ordered by file_id)
+        assert rows[0].file_id == file1_id
+        # file2's tags should be alphabetical (ordered by name within same parent_id)
+        file2_names = [r.tag_name for r in rows if r.file_id == file2_id]
+        assert file2_names == ["blues", "jazz"]
+
+    def test_skips_untagged_files(self, conn, make_tagged_file):
+        tagged_id = make_tagged_file("tagged.txt", [("rock",)])
+        untagged_id = crud.file.get_or_create(conn, Path("untagged.txt")).id
+
+        rows = service.get_file_tag_nodes(conn, [tagged_id, untagged_id])
+
+        assert len(rows) == 1
+        assert rows[0].file_id == tagged_id
+
+    def test_with_hierarchy(self, conn, make_tagged_file):
+        file1_id = make_tagged_file("a.txt", [("genre", "rock")])
+
+        rows = service.get_file_tag_nodes(conn, [file1_id])
+
+        assert len(rows) == 2
+        parent_row = next(r for r in rows if r.parent_id is None)
+        child_row = next(r for r in rows if r.parent_id is not None)
+        assert parent_row.tag_name == "genre"
+        assert child_row.tag_name == "rock"
+        assert child_row.parent_id == parent_row.id
