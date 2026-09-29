@@ -2,29 +2,29 @@ from collections import defaultdict
 from collections.abc import Sequence
 from itertools import groupby
 from pathlib import Path
-from sqlite3 import Connection, Row
+from sqlite3 import Connection
 
 from tagumori import crud
-from tagumori.models import File, TagalongNames, TaggedFile
+from tagumori.models import File, FileTagNode, TagalongNames, TaggedFile
 from tagumori.query import search
 from tagumori.query.ast import And, Expr, Not, Tag, and_
 from tagumori.utils import compile_matcher, flatten
 
 
 # utilities for turning the db file_tag structures to AST and paths
-def _db_to_ast(file_tags: Sequence[Row]) -> Expr:
+def _db_to_ast(file_tags: Sequence[FileTagNode]) -> Expr:
     """Turn db file_tag rows into an AST (with AND)"""
     nodes: dict[int, Tag] = {}
     children: dict[int, list[Expr]] = defaultdict(list)
     roots: list[Expr] = []
 
     for row in file_tags:
-        tag = Tag(name=row["name"])
-        nodes[row["id"]] = tag
-        if row["parent_id"] is None:
+        tag = Tag(name=row.tag_name)
+        nodes[row.id] = tag
+        if row.parent_id is None:
             roots.append(tag)
         else:
-            children[row["parent_id"]].append(tag)
+            children[row.parent_id].append(tag)
 
     # wire up children
     for id_, tag in nodes.items():
@@ -39,12 +39,12 @@ def _db_to_ast(file_tags: Sequence[Row]) -> Expr:
     return And(roots)
 
 
-def _paths_by_id(rows: Sequence[Row]) -> dict[int, tuple[str, ...]]:
-    names = {row["id"]: row["name"] for row in rows}
+def _paths_by_id(rows: Sequence[FileTagNode]) -> dict[int, tuple[str, ...]]:
+    names = {row.id: row.tag_name for row in rows}
     children: dict[int | None, list[int]] = defaultdict(list)
 
     for row in rows:
-        children[row["parent_id"]].append(row["id"])
+        children[row.parent_id].append(row.id)
 
     paths: dict[int, tuple[str, ...]] = {}
 
@@ -97,7 +97,7 @@ def _ast_to_path_closure(node: Expr, prefix=()) -> set[tuple[str, ...]]:
 
 
 # TODO: consider removing
-def _db_tags_to_leaf_paths(file_tags: Sequence[Row]) -> set[tuple[str, ...]]:
+def _db_tags_to_leaf_paths(file_tags: Sequence[FileTagNode]) -> set[tuple[str, ...]]:
     """Leaf paths only - see _paths_by_id for every node's materialized path."""
     return set(_ast_to_leaf_paths(_db_to_ast(file_tags)))
 
@@ -196,7 +196,7 @@ def lookup_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
     tags = crud.file_tag.get_by_file_ids(conn, ids)
 
     # tags are ordered by file id so we can groupby safely
-    lookup = {k: list(v) for k, v in groupby(tags, key=lambda x: x["file_id"])}
+    lookup = {k: list(v) for k, v in groupby(tags, key=lambda x: x.file_id)}
 
     return [TaggedFile(f, _db_to_ast(lookup.get(f.id, []))) for f in files]
 

@@ -326,7 +326,7 @@ class TestFileTag:
         rows = crud.file_tag.get_by_file_ids(conn, [file_id])
 
         assert len(rows) == 1
-        assert rows[0]["name"] == "rock"
+        assert rows[0].tag_name == "rock"
 
     def test_get_by_file_ids_multiple_files(self, conn, make_tagged_file):
         file1_id = make_tagged_file("a.txt", [("rock",)])
@@ -335,7 +335,7 @@ class TestFileTag:
         rows = crud.file_tag.get_by_file_ids(conn, [file1_id, file2_id])
 
         assert len(rows) == 2
-        names = {row["name"] for row in rows}
+        names = {row.tag_name for row in rows}
         assert names == {"rock", "jazz"}
 
     def test_get_by_file_ids_results_include_file_id(self, conn, make_tagged_file):
@@ -344,7 +344,7 @@ class TestFileTag:
 
         rows = crud.file_tag.get_by_file_ids(conn, [file1_id, file2_id])
 
-        returned_file_ids = {row["file_id"] for row in rows}
+        returned_file_ids = {row.file_id for row in rows}
         assert returned_file_ids == {file1_id, file2_id}
 
     def test_get_by_file_ids_ordered_by_file_id_parent_id_name(
@@ -359,9 +359,9 @@ class TestFileTag:
         rows = crud.file_tag.get_by_file_ids(conn, [file1_id, file2_id])
 
         # file1 results should come before file2 (ordered by file_id)
-        assert rows[0]["file_id"] == file1_id
+        assert rows[0].file_id == file1_id
         # file2's tags should be alphabetical (ordered by name within same parent_id)
-        file2_names = [r["name"] for r in rows if r["file_id"] == file2_id]
+        file2_names = [r.tag_name for r in rows if r.file_id == file2_id]
         assert file2_names == ["blues", "jazz"]
 
     def test_get_by_file_ids_skips_untagged_files(self, conn, make_tagged_file):
@@ -371,7 +371,7 @@ class TestFileTag:
         rows = crud.file_tag.get_by_file_ids(conn, [tagged_id, untagged_id])
 
         assert len(rows) == 1
-        assert rows[0]["file_id"] == tagged_id
+        assert rows[0].file_id == tagged_id
 
     def test_get_by_file_ids_with_hierarchy(self, conn, make_tagged_file):
         file1_id = make_tagged_file("a.txt", [("genre", "rock")])
@@ -379,11 +379,11 @@ class TestFileTag:
         rows = crud.file_tag.get_by_file_ids(conn, [file1_id])
 
         assert len(rows) == 2
-        parent_row = next(r for r in rows if r["parent_id"] is None)
-        child_row = next(r for r in rows if r["parent_id"] is not None)
-        assert parent_row["name"] == "genre"
-        assert child_row["name"] == "rock"
-        assert child_row["parent_id"] == parent_row["id"]
+        parent_row = next(r for r in rows if r.parent_id is None)
+        child_row = next(r for r in rows if r.parent_id is not None)
+        assert parent_row.tag_name == "genre"
+        assert child_row.tag_name == "rock"
+        assert child_row.parent_id == parent_row.id
 
     def test_drop_for_file(self, conn, file_and_tag):
         file_id, tag_id = file_and_tag
@@ -402,7 +402,7 @@ class TestFileTag:
         crud.file_tag.replace(conn, tag_id, new_tag.id)
 
         rows = crud.file_tag.get_by_file_ids(conn, [file_id])
-        assert rows[0]["name"] == "jazz"
+        assert rows[0].tag_name == "jazz"
 
 
 class TestTagalong:
@@ -450,7 +450,7 @@ class TestTagalong:
         crud.tagalong.apply(conn, [file_row.id])
 
         rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        tag_names = {r["name"] for r in rows}
+        tag_names = {r.tag_name for r in rows}
         assert tag_names == {"rock", "guitar"}
 
     def test_apply_transitive(self, conn):
@@ -468,7 +468,7 @@ class TestTagalong:
         crud.tagalong.apply(conn, [file_row.id])
 
         rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        tag_names = {r["name"] for r in rows}
+        tag_names = {r.tag_name for r in rows}
         assert tag_names == {"A", "B", "C"}
 
     @pytest.mark.parametrize(
@@ -497,7 +497,7 @@ class TestTagalong:
         crud.tagalong.apply(conn, [file_row.id])
 
         rows = crud.file_tag.get_by_file_ids(conn, [file_row.id])
-        tag_names = {r["name"] for r in rows}
+        tag_names = {r.tag_name for r in rows}
         assert tag_names == set(names)
 
 
@@ -571,9 +571,9 @@ class TestCascadeDeletes:
         leaving its ancestors (and siblings) untouched."""
         fid = make_tagged_file("test.txt", [tag_names])
         rows = crud.file_tag.get_by_file_ids(conn, [fid])
-        ft_id_by_name = {r["name"]: r["id"] for r in rows}
+        ft_id_by_name = {r.tag_name: r.id for r in rows}
 
         crud.file_tag.detach(conn, ft_id_by_name[detach_name])
 
         remaining = crud.file_tag.get_by_file_ids(conn, [fid])
-        assert [r["name"] for r in remaining] == expected_remaining
+        assert [r.tag_name for r in remaining] == expected_remaining

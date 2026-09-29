@@ -104,6 +104,14 @@ class TaggedFile:
 
 
 @dataclass
+class FileTagNode:
+    file_id: int
+    id: int
+    tag_name: str
+    parent_id: int
+
+
+@dataclass
 class TagalongNames:
     tag_name: str
     tagalong_name: str

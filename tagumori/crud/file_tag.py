@@ -1,7 +1,9 @@
-from sqlite3 import Connection, Row
+from sqlite3 import Connection
+
+from tagumori.models import FileTagNode
 
 
-def get_by_file_ids(conn: Connection, file_ids: list[int]) -> list[Row]:
+def get_by_file_ids(conn: Connection, file_ids: list[int]) -> list[FileTagNode]:
     if not file_ids:
         return []
 
@@ -10,7 +12,7 @@ def get_by_file_ids(conn: Connection, file_ids: list[int]) -> list[Row]:
         SELECT
             file_tag.file_id,
             file_tag.id,
-            tag.name,
+            tag.name tag_name,
             file_tag.parent_id
         FROM file_tag
         JOIN tag
@@ -18,7 +20,7 @@ def get_by_file_ids(conn: Connection, file_ids: list[int]) -> list[Row]:
         WHERE file_tag.file_id IN ({placeholders})
         ORDER BY file_id, parent_id, name
     """
-    return conn.execute(q, file_ids).fetchall()
+    return [FileTagNode(**row) for row in conn.execute(q, file_ids).fetchall()]
 
 
 def replace(conn: Connection, old_id: int, new_id: int) -> None:
