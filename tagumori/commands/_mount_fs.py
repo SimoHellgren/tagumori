@@ -65,15 +65,23 @@ class TagumoriFS(Operations):
         raise FuseOSError(errno.ENOENT)
 
     def readdir(self, path: str, fh: int) -> list[str | tuple]:
+        now = time.time()
         if path == "/":
             tags = [t.name for t in self.vault.tags.get_all()]
-            return [".", "..", *tags]
+            entries = [(name, _dir_attrs(now), 0) for name in tags]
 
         else:
             lookup_ids = resolve_path(self.vault, path)
             kids = child_tags(self.vault, lookup_ids)
-            paths = [Path(p).name for p in files_at(self.vault, lookup_ids)]
-            return [".", "..", *kids, *paths]
+            targets = files_at(self.vault, lookup_ids)
+
+            entries = [(name, _dir_attrs(now), 0) for name in kids]
+
+            entries += [
+                (Path(target).name, _link_attrs(now, target), 0) for target in targets
+            ]
+
+        return [".", "..", *entries]
 
     def readlink(self, path: str) -> str:
         *init, last = path.split("/")
