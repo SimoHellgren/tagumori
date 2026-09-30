@@ -11,7 +11,7 @@ from collections.abc import Collection
 from tagumori.vault import Vault
 
 _resolve_cache: dict[str, frozenset[int]] = {}
-_files_cache: dict[frozenset[int], list[str]] = []
+_files_cache: dict[frozenset[int], list[str]] = {}
 _cache_version: int | None = None
 
 
@@ -65,12 +65,13 @@ def resolve_path(vault: Vault, path: str) -> frozenset[int]:
         ).fetchall()
 
         if not kids:
-            return set()
+            return frozenset()
 
         next_ids = {r["id"] for r in kids}
 
-    _resolve_cache[path] = frozenset(next_ids)
-    return next_ids
+    result = frozenset(next_ids)
+    _resolve_cache[path] = result
+    return result
 
 
 def child_tags(vault: Vault, ids: Collection[int]) -> list[str]:
