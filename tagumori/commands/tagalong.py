@@ -4,13 +4,12 @@ from pathlib import Path
 import click
 
 import tagumori.service
-from tagumori import crud
 from tagumori.commands.context import LazyVault
 
 
 @click.group(help="Tagalong management")
 @click.pass_obj
-def tagalong(vault: LazyVault):
+def tagalong(lazy_vault: LazyVault):
     pass
 
 
@@ -18,34 +17,34 @@ def tagalong(vault: LazyVault):
 @click.option("-t", "--tag", required=True, multiple=True)
 @click.option("-ta", "--tagalong", required=True, multiple=True)
 @click.pass_obj
-def add(vault: LazyVault, tag: tuple[str, ...], tagalong: tuple[str, ...]):
-    with vault as conn:
-        sources = crud.tag.get_or_create_many(conn, tag)
-        targets = crud.tag.get_or_create_many(conn, tagalong)
+def add(lazy_vault: LazyVault, tag: tuple[str, ...], tagalong: tuple[str, ...]):
+    with lazy_vault as vault:
+        sources = vault.tags.get_or_create_many(tag)
+        targets = vault.tags.get_or_create_many(tagalong)
 
         for source, target in product(sources, targets):
-            crud.tagalong.create(conn, source.id, target.id)
+            vault.tagalongs.create(source.id, target.id)
 
 
 @tagalong.command(help="Remove tagalongs.")
 @click.option("-t", "--tag", required=True, multiple=True)
 @click.option("-ta", "--tagalong", required=True, multiple=True)
 @click.pass_obj
-def remove(vault: LazyVault, tag: tuple[str, ...], tagalong: tuple[str, ...]):
-    with vault as conn:
-        sources = crud.tag.get_many_by_name(conn, tag)
-        targets = crud.tag.get_many_by_name(conn, tagalong)
+def remove(lazy_vault: LazyVault, tag: tuple[str, ...], tagalong: tuple[str, ...]):
+    with lazy_vault as vault:
+        sources = vault.tags.get_many_by_name(tag)
+        targets = vault.tags.get_many_by_name(tagalong)
 
         for source, target in product(sources, targets):
-            crud.tagalong.delete(conn, source.id, target.id)
+            vault.tagalongs.delete(source.id, target.id)
 
 
 @tagalong.command(help="Show all tagalongs.")
 @click.pass_obj
-def ls(vault: LazyVault):
+def ls(lazy_vault: LazyVault):
     # TODO: Consider adding a grep-like filter if such would prove to be useful
-    with vault as conn:
-        for ta in tagumori.service.list_tagalong_names(conn):
+    with lazy_vault as vault:
+        for ta in tagumori.service.list_tagalong_names(vault):
             click.echo(f"{ta.tag_name} -> {ta.tagalong_name}")
 
 
@@ -54,10 +53,10 @@ def ls(vault: LazyVault):
     "-f", "--file", type=click.Path(path_type=Path, exists=True), multiple=True
 )
 @click.pass_obj
-def apply(vault: LazyVault, file: tuple[Path, ...]):
+def apply(lazy_vault: LazyVault, file: tuple[Path, ...]):
     # TODO: consider filtering by tag
-    with vault as conn:
-        files = crud.file.get_many_by_path(conn, file)
+    with lazy_vault as vault:
+        files = vault.files.get_many_by_path(file)
         file_ids = [f.id for f in files]
 
-        crud.tagalong.apply(conn, file_ids)
+        vault.tagalongs.apply(file_ids)

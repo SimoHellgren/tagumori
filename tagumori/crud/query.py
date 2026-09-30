@@ -5,12 +5,14 @@ from tagumori.models import Query
 
 
 class QueryCRUD(BaseCRUD[Query]):
-    def get_by_name(self, conn: Connection, name: str):
-        return self.get_by_unique_col(conn, name)
+    def __init__(self, conn: Connection):
+        super().__init__(conn, table="query", unique_col="name", model=Query)
+
+    def get_by_name(self, name: str):
+        return self.get_by_unique_col(name)
 
     def create(
         self,
-        conn: Connection,
         name: str,
         select_tags: str,
         exclude_tags: str,
@@ -20,7 +22,7 @@ class QueryCRUD(BaseCRUD[Query]):
         invert_match: bool,
     ) -> Query:
         return self._one_or_raise(
-            conn.execute(
+            self._conn.execute(
                 """
             INSERT INTO query(
                 name,
@@ -46,7 +48,6 @@ class QueryCRUD(BaseCRUD[Query]):
 
     def upsert(
         self,
-        conn: Connection,
         name: str,
         select_tags: str,
         exclude_tags: str,
@@ -56,7 +57,7 @@ class QueryCRUD(BaseCRUD[Query]):
         invert_match: bool,
     ) -> Query:
         return self._one_or_raise(
-            conn.execute(
+            self._conn.execute(
                 """
             INSERT INTO query(
                 name,
@@ -89,6 +90,3 @@ class QueryCRUD(BaseCRUD[Query]):
                 ),
             ).fetchone()
         )
-
-
-query = QueryCRUD(table="query", unique_col="name", model=Query)

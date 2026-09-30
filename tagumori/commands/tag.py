@@ -1,6 +1,5 @@
 import click
 
-from tagumori import crud
 from tagumori.commands.common import regex_options
 from tagumori.commands.context import LazyVault
 from tagumori.utils import compile_matcher
@@ -8,7 +7,7 @@ from tagumori.utils import compile_matcher
 
 @click.group(help="Tag management")
 @click.pass_obj
-def tag(vault: LazyVault):
+def tag(lazy_vault: LazyVault):
     pass
 
 
@@ -16,9 +15,9 @@ def tag(vault: LazyVault):
 @click.option("-n", "--name", type=click.STRING, required=True)
 @click.option("-c", "--category", type=click.STRING)
 @click.pass_obj
-def new_tag(vault: LazyVault, name: str, category: str | None):
-    with vault as conn:
-        crud.tag.create(conn, name, category)
+def new_tag(lazy_vault: LazyVault, name: str, category: str | None):
+    with lazy_vault as vault:
+        vault.tags.create(name, category)
 
 
 @tag.command(help="Edit tag", name="edit")
@@ -29,7 +28,7 @@ def new_tag(vault: LazyVault, name: str, category: str | None):
     "--clear-category", type=click.BOOL, is_flag=True, help="Sets category to null."
 )
 @click.pass_obj
-def edit_tag(vault: LazyVault, tag: list[str], clear_category: bool, **kwargs):
+def edit_tag(lazy_vault: LazyVault, tag: list[str], clear_category: bool, **kwargs):
     if len(tag) > 1 and kwargs["name"]:
         raise click.BadArgumentUsage(
             "--name can't be present when multiple tags are given."
@@ -46,12 +45,8 @@ def edit_tag(vault: LazyVault, tag: list[str], clear_category: bool, **kwargs):
     if clear_category:
         data["category"] = None
 
-    with vault as conn:
-        crud.tag.update(
-            conn,
-            tag,
-            data,
-        )
+    with lazy_vault as vault:
+        vault.tags.update(tag, data)
 
 
 @tag.command(help="Replace all instances of a tag.", name="replace")
@@ -64,33 +59,32 @@ def edit_tag(vault: LazyVault, tag: list[str], clear_category: bool, **kwargs):
     help="Remove the replaced tags entirely.",
 )
 @click.pass_obj
-def replace_tag(vault: LazyVault, old: tuple[str, ...], new: str, remove: bool):
-    with vault as conn:
-        new_record = crud.tag.get_or_create(conn, new)
-        olds = crud.tag.get_many_by_name(conn, old)
+def replace_tag(lazy_vault: LazyVault, old: tuple[str, ...], new: str, remove: bool):
+    with lazy_vault as vault:
+        new_record = vault.tags.get_or_create(new)
+        olds = vault.tags.get_many_by_name(old)
         for old_record in olds:
-            crud.file_tag.replace(conn, old_record.id, new_record.id)
+            vault.file_tags.replace(old_record.id, new_record.id)
 
             if remove:
-                crud.tag.delete(conn, old_record.id)
+                vault.tags.delete(old_record.id)
 
 
 @tag.command(help="Removes all instances of a tag.", name="delete")
 @click.argument("tags", nargs=-1, type=click.STRING, required=True)
 @click.pass_obj
-def remove_tag(vault: LazyVault, tags: tuple[str, ...]):
+def remove_tag(lazy_vault: LazyVault, tags: tuple[str, ...]):
     click.confirm(
         "Are you sure? This will also delete all child filetags of deleted tags.",
         abort=True,
     )
 
-    with vault as conn:
+    with lazy_vault as vault:
         for tag in tags:
-            if not (db_tag := crud.tag.get_by_name(conn, tag)):
+            if not (db_tag := vault.tags.get_by_name(tag)):
                 raise click.ClickException(f"Tag '{tag}' not found in vault.")
 
-            tag_id = db_tag.id
-            crud.tag.delete(conn, tag_id)
+            vault.tags.delete(db_tag.id)
 
 
 @tag.command(help="List tags", name="ls")
@@ -98,14 +92,14 @@ def remove_tag(vault: LazyVault, tags: tuple[str, ...]):
 @regex_options
 @click.pass_obj
 def list_tags(
-    vault: LazyVault,
+    lazy_vault: LazyVault,
     long: bool,
     pattern: str,
     ignore_case: bool,
     invert_match: bool,
 ):
-    with vault as conn:
-        tags = sorted(crud.tag.get_all(conn), key=lambda x: x.name)
+    with lazy_vault as vault:
+        tags = sorted(vault.tags.get_all(), key=lambda x: x.name)
 
     matcher = compile_matcher(pattern, ignore_case, invert_match)
 

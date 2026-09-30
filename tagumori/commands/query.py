@@ -4,7 +4,7 @@ from random import random
 
 import click
 
-from tagumori import crud, service
+from tagumori import service
 from tagumori.commands.common import file_print_options, query_options, regex_options
 from tagumori.commands.context import LazyVault
 from tagumori.models import Query
@@ -30,7 +30,7 @@ def query(vault: LazyVault):
 )
 @click.pass_obj
 def save(
-    vault: LazyVault,
+    lazy_vault: LazyVault,
     name: str,
     select: Expr | None,
     exclude: Expr | None,
@@ -40,8 +40,8 @@ def save(
     invert_match: bool,
     force: bool,
 ):
-    with vault as conn:
-        if not force and crud.query.get_by_name(conn, name):
+    with lazy_vault as vault:
+        if not force and vault.queries.get_by_name(name):
             raise click.ClickException(
                 f"Query '{name}' already exists. Run with --force to overwrite."
             )
@@ -51,8 +51,7 @@ def save(
         selects = [str(select)] if select else []
         excludes = [str(exclude)] if exclude else []
 
-        crud.query.upsert(
-            conn,
+        vault.queries.upsert(
             name=name,
             select_tags=json.dumps(selects),
             exclude_tags=json.dumps(excludes),
@@ -77,7 +76,7 @@ def save(
 @click.option("--shuffle", is_flag=True, help="Randomize result order")
 @click.pass_obj
 def run(
-    vault: LazyVault,
+    lazy_vault: LazyVault,
     pattern: str,
     long: bool,
     relative_to: Path,
@@ -86,15 +85,15 @@ def run(
     shuffle: bool,
 ):
 
-    with vault as conn:
-        queries = crud.query.get_all(conn)
+    with lazy_vault as vault:
+        queries = vault.queries.get_all()
 
         for query in queries:
             if not re.match(pattern, query.name):
                 continue
 
             files = service.list_files(
-                conn,
+                vault,
                 query.select_tags,
                 query.exclude_tags,
                 bool(query.ignore_tag_case),
@@ -145,9 +144,9 @@ def ls_long_format(data: Query):
 @query.command(help="List all saved queries.")
 @click.option("-l", "--long", is_flag=True)
 @click.pass_obj
-def ls(vault: LazyVault, long: bool):
-    with vault as conn:
-        records = sorted(crud.query.get_all(conn), key=lambda x: x.name)
+def ls(lazy_vault: LazyVault, long: bool):
+    with lazy_vault as vault:
+        records = sorted(vault.queries.get_all(), key=lambda x: x.name)
 
     for record in records:
         msg = click.style(record.name, fg="yellow")
@@ -161,10 +160,10 @@ def ls(vault: LazyVault, long: bool):
 @query.command(help="Delete query.")
 @click.argument("name", nargs=-1, type=str)
 @click.pass_obj
-def drop(vault: LazyVault, name: tuple[str, ...]):
-    with vault as conn:
+def drop(lazy_vault: LazyVault, name: tuple[str, ...]):
+    with lazy_vault as vault:
         for name_ in name:
-            record = crud.query.get_by_name(conn, name_)
+            record = vault.queries.get_by_name(name_)
             if not record:
                 raise click.ClickException(f"Query {name_} not found.")
-            crud.query.delete(conn, record.id)
+            vault.queries.delete(record.id)

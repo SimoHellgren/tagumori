@@ -2,7 +2,7 @@ import click
 import pytest
 from prompt_toolkit.document import Document
 
-from tagumori import crud, service
+from tagumori import service
 from tagumori.commands import _review_tui as review_tui_module
 from tagumori.commands import review as review_module
 from tagumori.commands._review_tui import REPL, TagCompleter
@@ -20,7 +20,8 @@ def lazy_vault(vault) -> LazyVault:
 @pytest.fixture
 def session(lazy_vault, sample_files) -> ReviewSession:
     """A session over two untagged files."""
-    return ReviewSession(lazy_vault, list(sample_files))
+    with lazy_vault as vault:
+        return ReviewSession(vault, list(sample_files))
 
 
 class ScriptedPrompts:
@@ -105,7 +106,8 @@ class TestNavigation:
 
 class TestKnownTags:
     def test_seeds_from_vault(self, lazy_vault, tagged_file):
-        session = ReviewSession(lazy_vault, [tagged_file])
+        with lazy_vault as vault:
+            session = ReviewSession(vault, [tagged_file])
 
         assert session.known_tags == {"rock"}
 
@@ -134,18 +136,18 @@ class TestAddTags:
     def test_tags_are_persisted(self, session, lazy_vault, sample_files):
         session.add_tags("rock")
 
-        with lazy_vault as conn:
-            file = crud.file.get_by_path(conn, sample_files[0])
+        with lazy_vault as vault:
+            file = vault.files.get_by_path(sample_files[0])
             assert file is not None
-            tagged = service.lookup_tags(conn, [file])
+            tagged = service.lookup_tags(vault, [file])
 
         assert "rock" in str(tagged[0].tags)
 
     def test_applies_only_to_the_current_file(self, session, lazy_vault, sample_files):
         session.add_tags("rock")
 
-        with lazy_vault as conn:
-            other = crud.file.get_by_path(conn, sample_files[1])
+        with lazy_vault as vault:
+            other = vault.files.get_by_path(sample_files[1])
 
         assert other is None
 
@@ -153,10 +155,10 @@ class TestAddTags:
         session.next()
         session.add_tags("jazz")
 
-        with lazy_vault as conn:
-            file = crud.file.get_by_path(conn, sample_files[1])
+        with lazy_vault as vault:
+            file = vault.files.get_by_path(sample_files[1])
             assert file is not None
-            tagged = service.lookup_tags(conn, [file])
+            tagged = service.lookup_tags(vault, [file])
 
         assert "jazz" in str(tagged[0].tags)
 
@@ -165,19 +167,21 @@ class TestAddTags:
     ):
         session.add_tags("artist[Led Zeppelin]")
 
-        with lazy_vault as conn:
-            file = crud.file.get_by_path(conn, sample_files[0])
+        with lazy_vault as vault:
+            file = vault.files.get_by_path(sample_files[0])
             assert file is not None
-            tagged = service.lookup_tags(conn, [file])
+            tagged = service.lookup_tags(vault, [file])
 
         assert str(tagged[0].tags) == "artist[Led Zeppelin]"
 
     def test_each_add_commits_independently(self, lazy_vault, sample_files):
         """A later session must see what an earlier one wrote."""
-        first = ReviewSession(lazy_vault, list(sample_files))
+        with lazy_vault as vault:
+            first = ReviewSession(vault, list(sample_files))
         first.add_tags("rock")
 
-        second = ReviewSession(lazy_vault, list(sample_files))
+        with lazy_vault as vault:
+            second = ReviewSession(vault, list(sample_files))
 
         assert "rock" in second.known_tags
 
@@ -195,8 +199,8 @@ class TestAddTags:
         with pytest.raises(ValueError):
             session.add_tags("!rock")
 
-        with lazy_vault as conn:
-            assert crud.file.get_by_path(conn, sample_files[0]) is None
+        with lazy_vault as vault:
+            assert vault.files.get_by_path(sample_files[0]) is None
 
 
 class TestFileInfo:
@@ -206,7 +210,8 @@ class TestFileInfo:
         assert "not in vault" in capsys.readouterr().out
 
     def test_tracked_file_shows_its_tags(self, lazy_vault, tagged_file, capsys):
-        session = ReviewSession(lazy_vault, [tagged_file])
+        with lazy_vault as vault:
+            session = ReviewSession(vault, [tagged_file])
 
         session.file_info()
 
@@ -403,9 +408,9 @@ class TestReviewCommand:
 
         assert result.exit_code == 0
 
-        with lazy_vault as c:
-            file = crud.file.get_by_path(c, sample_files[0])
+        with lazy_vault as vault:
+            file = vault.files.get_by_path(sample_files[0])
             assert file is not None
-            tagged = service.lookup_tags(c, [file])
+            tagged = service.lookup_tags(vault, [file])
 
         assert "rock" in str(tagged[0].tags)

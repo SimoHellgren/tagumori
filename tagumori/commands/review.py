@@ -4,21 +4,21 @@ from typing import TextIO
 
 import click
 
-from tagumori import crud, service
+from tagumori import service
 from tagumori.commands.context import LazyVault
 from tagumori.query import parse_for_storage
 from tagumori.render import print_file_info
 from tagumori.utils import flatten
+from tagumori.vault import Vault
 
 
 class ReviewSession:
-    def __init__(self, vault: LazyVault, items: list[Path]):
+    def __init__(self, vault: Vault, items: list[Path]):
         self.vault = vault
         self.items = items
         self.index = 0
 
-        with vault as conn:
-            self.known_tags = {t.name for t in crud.tag.get_all(conn)}
+        self.known_tags = {t.name for t in vault.tags.get_all()}
 
     @property
     def current(self) -> Path:
@@ -38,14 +38,14 @@ class ReviewSession:
         self.index = index
 
     def file_info(self) -> None:
-        with self.vault as conn:
-            file = crud.file.get_by_path(conn, self.current)
 
-            if not file:
-                click.echo("File not in vault")
-                return
+        file = self.vault.files.get_by_path(self.current)
 
-            tagged_file = service.lookup_tags(conn, [file])
+        if not file:
+            click.echo("File not in vault")
+            return
+
+        tagged_file = service.lookup_tags(self.vault, [file])
 
         print_file_info(tagged_file[0])
 
@@ -53,8 +53,7 @@ class ReviewSession:
         # validate before hitting db
         node = parse_for_storage(expr)
 
-        with self.vault as conn:
-            service.add_tags_to_files(conn, [self.current], node)
+        service.add_tags_to_files(self.vault, [self.current], node)
 
         # TODO: should probably make _ast_to_leaf_paths a public method
         # TODO: paths is also a bit overkill - could just recurse to get unique tags
@@ -70,7 +69,7 @@ def _stdio_has_tty() -> bool:
 @click.command()
 @click.argument("file", type=click.File("r"))
 @click.pass_obj
-def review(vault: LazyVault, file: TextIO):
+def review(lazy_vault: LazyVault, file: TextIO):
     from tagumori.commands._review_tui import REPL
 
     lines = [Path(l.strip()) for l in file if l.strip()]
@@ -84,7 +83,8 @@ def review(vault: LazyVault, file: TextIO):
             "review needs an interactive terminal; none of stdin/stdout/stderr is one."
         )
 
-    session = ReviewSession(vault, lines)
+    with lazy_vault as vault:
+        session = ReviewSession(vault, lines)
 
     repl = REPL(session)
 

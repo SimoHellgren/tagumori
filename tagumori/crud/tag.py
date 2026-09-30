@@ -6,29 +6,32 @@ from tagumori.models import Tag
 
 
 class TagCRUD(BaseCRUD[Tag]):
-    def get_by_name(self, conn: Connection, name: str) -> Tag | None:
-        return self.get_by_unique_col(conn, name)
+    def __init__(self, conn: Connection):
+        super().__init__(conn, table="tag", unique_col="name", model=Tag)
 
-    def get_many_by_name(self, conn: Connection, names: Sequence[str]) -> list[Tag]:
-        return self.get_many_by_unique_col(conn, names)
+    def get_by_name(self, name: str) -> Tag | None:
+        return self.get_by_unique_col(name)
 
-    def create(self, conn: Connection, name: str, category: str | None = None) -> Tag:
+    def get_many_by_name(self, names: Sequence[str]) -> list[Tag]:
+        return self.get_many_by_unique_col(names)
+
+    def create(self, name: str, category: str | None = None) -> Tag:
         return self._one_or_raise(
-            conn.execute(
+            self._conn.execute(
                 "INSERT INTO tag(name, category) VALUES (?, ?) RETURNING *",
                 (name, category),
             ).fetchone()
         )
 
-    def get_or_create(self, conn: Connection, name: str) -> Tag:
+    def get_or_create(self, name: str) -> Tag:
         q = """
             INSERT INTO tag(name) VALUES (?)
             ON CONFLICT (name) DO UPDATE SET name=name --no-op
             RETURNING *
         """
-        return self._one_or_raise(conn.execute(q, (name,)).fetchone())
+        return self._one_or_raise(self._conn.execute(q, (name,)).fetchone())
 
-    def get_or_create_many(self, conn: Connection, names: Sequence[str]) -> list[Tag]:
+    def get_or_create_many(self, names: Sequence[str]) -> list[Tag]:
         vals = _placeholders(len(names), "(?)")
 
         q = f"""
@@ -37,9 +40,9 @@ class TagCRUD(BaseCRUD[Tag]):
             RETURNING *
         """
 
-        return self._many(conn.execute(q, names).fetchall())
+        return self._many(self._conn.execute(q, names).fetchall())
 
-    def update(self, conn: Connection, names: list[str], data: dict) -> None:
+    def update(self, names: list[str], data: dict) -> None:
         ALLOWED_COLS = {"name", "category"}
 
         if forbidden := (data.keys() - ALLOWED_COLS):
@@ -54,7 +57,4 @@ class TagCRUD(BaseCRUD[Tag]):
         """
 
         vals = (*data.values(), *names)
-        conn.execute(q, vals)
-
-
-tag = TagCRUD(table="tag", unique_col="name", model=Tag)
+        self._conn.execute(q, vals)

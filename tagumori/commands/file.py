@@ -3,7 +3,7 @@ from pathlib import Path
 
 import click
 
-from tagumori import crud, service
+from tagumori import service
 from tagumori.commands.context import LazyVault
 from tagumori.models import FileStatus
 from tagumori.render import print_file_info
@@ -11,7 +11,7 @@ from tagumori.render import print_file_info
 
 @click.group(help="File management")
 @click.pass_obj
-def file(vault: LazyVault):
+def file(lazy_vault: LazyVault):
     pass
 
 
@@ -19,24 +19,24 @@ def file(vault: LazyVault):
 @click.argument("files", nargs=-1, type=click.Path(path_type=Path))
 @click.option("-i", "--inode", type=int, help="Lookup by inode.")
 @click.pass_obj
-def info(vault: LazyVault, files: Sequence[Path], inode: int):
+def info(lazy_vault: LazyVault, files: Sequence[Path], inode: int):
     if files and inode:
         raise click.UsageError("Cannot use both --inode and file paths")
 
     if not (files or inode):
         raise click.UsageError("Provide file path or --inode")
 
-    with vault as conn:
+    with lazy_vault as vault:
         if inode is not None:
-            records = crud.file.get_by_inode(conn, inode)
+            records = vault.files.get_by_inode(inode)
 
             if not records:
                 return
 
         else:
-            records = crud.file.get_many_by_path(conn, files)
+            records = vault.files.get_many_by_path(files)
 
-        files_with_tags = service.lookup_tags(conn, records)
+        files_with_tags = service.lookup_tags(vault, records)
 
     for file in files_with_tags:
         print_file_info(file)
@@ -47,9 +47,9 @@ def info(vault: LazyVault, files: Sequence[Path], inode: int):
     "files", nargs=-1, type=click.Path(path_type=Path, exists=True, dir_okay=False)
 )
 @click.pass_obj
-def add(vault: LazyVault, files: Sequence[Path]):
-    with vault as conn:
-        crud.file.get_or_create_many(conn, files)
+def add(lazy_vault: LazyVault, files: Sequence[Path]):
+    with lazy_vault as vault:
+        vault.files.get_or_create_many(files)
 
 
 @file.command(help="Drop files from db.")
@@ -57,15 +57,15 @@ def add(vault: LazyVault, files: Sequence[Path]):
     "files", nargs=-1, type=click.Path(path_type=Path, dir_okay=False), required=True
 )
 @click.pass_obj
-def drop(vault: LazyVault, files: Sequence[Path]):
-    with vault as conn:
-        records = crud.file.get_many_by_path(conn, files)
+def drop(lazy_vault: LazyVault, files: Sequence[Path]):
+    with lazy_vault as vault:
+        records = vault.files.get_many_by_path(files)
         click.confirm(
             f"Going do drop {len(records)} file(s) from database (file itself will remain on disk). You sure about this?",
             abort=True,
         )
         for file in records:
-            crud.file.delete(conn, file.id)
+            vault.files.delete(file.id)
 
 
 @file.command(help="Edit file record.")
@@ -81,7 +81,7 @@ def drop(vault: LazyVault, files: Sequence[Path]):
 @click.option("--path", type=click.Path(path_type=Path, dir_okay=False, exists=True))
 @click.pass_obj
 def edit(
-    vault: LazyVault,
+    lazy_vault: LazyVault,
     files: Sequence[Path],
     refresh: bool,
     relocate: Path | None,
@@ -98,31 +98,31 @@ def edit(
     if len(files) > 1 and path:
         raise click.UsageError("Can't provide multiple files and --path")
 
-    with vault as conn:
-        records = crud.file.get_many_by_path(conn, files)
+    with lazy_vault as vault:
+        records = vault.files.get_many_by_path(files)
         if path:
             stat = path.stat()  # stat the new file
-            crud.file.update(conn, records[0].id, path, stat.st_ino, stat.st_dev)
+            vault.files.update(records[0].id, path, stat.st_ino, stat.st_dev)
 
         elif refresh:
             for record in records:
                 p = Path(record.path)
                 stat = p.stat()
-                crud.file.update(conn, record.id, p, stat.st_ino, stat.st_dev)
+                vault.files.update(record.id, p, stat.st_ino, stat.st_dev)
 
         elif relocate:
             for record in records:
-                service.relocate_file(conn, record, relocate)
+                service.relocate_file(vault, record, relocate)
 
 
 @file.command(help="Check file health.")
 @click.option("--fix", is_flag=True, help="Fix missing inodes by refreshing from path")
 @click.pass_obj
-def check(vault: LazyVault, fix: bool):
+def check(lazy_vault: LazyVault, fix: bool):
     issues: list[tuple[Path, FileStatus, bool]] = []
 
-    with vault as conn:
-        all_files = crud.file.get_all(conn)
+    with lazy_vault as vault:
+        all_files = vault.files.get_all()
 
         for record in all_files:
             p = Path(record.path)
@@ -135,7 +135,7 @@ def check(vault: LazyVault, fix: bool):
             # Auto-fix missing inodes (file exists, just needs stat)
             if status == FileStatus.INODE_MISSING and fix:
                 stat = p.stat()
-                crud.file.update(conn, record.id, p, stat.st_ino, stat.st_dev)
+                vault.files.update(record.id, p, stat.st_ino, stat.st_dev)
                 issues.append((p, status, True))
             else:
                 issues.append((p, status, False))
@@ -161,7 +161,7 @@ def check(vault: LazyVault, fix: bool):
 @click.option("-t", "--to", "dst", required=True, type=click.Path(path_type=Path))
 @click.option("-f", "--force", is_flag=True, help="Overwrite without confirmation")
 @click.pass_obj
-def mv(vault: LazyVault, sources: Sequence[Path], dst: Path, force: bool):
+def mv(lazy_vault: LazyVault, sources: Sequence[Path], dst: Path, force: bool):
     import shutil
 
     if not sources:
@@ -173,9 +173,9 @@ def mv(vault: LazyVault, sources: Sequence[Path], dst: Path, force: bool):
             "Destination must be a directory when moving multiple files"
         )
 
-    with vault as conn:
+    with lazy_vault as vault:
         for src in sources:
-            record = crud.file.get_by_path(conn, src)
+            record = vault.files.get_by_path(src)
 
             if not record:
                 raise click.ClickException(f"{src} is not tracked in the vault")
@@ -191,6 +191,6 @@ def mv(vault: LazyVault, sources: Sequence[Path], dst: Path, force: bool):
 
             shutil.move(src, actual_dst)
             stat = actual_dst.stat()
-            crud.file.update(conn, record.id, actual_dst, stat.st_ino, stat.st_dev)
+            vault.files.update(record.id, actual_dst, stat.st_ino, stat.st_dev)
 
             click.echo(f"Moved {src} -> {actual_dst}")

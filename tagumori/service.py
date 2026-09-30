@@ -2,13 +2,12 @@ from collections import defaultdict
 from collections.abc import Sequence
 from itertools import groupby
 from pathlib import Path
-from sqlite3 import Connection
 
-from tagumori import crud
 from tagumori.models import File, FileTagNode, TagalongNames, TaggedFile
 from tagumori.query import search
 from tagumori.query.ast import And, Expr, Not, Tag, and_
 from tagumori.utils import compile_matcher, flatten
+from tagumori.vault import Vault
 
 
 # utilities for turning the db file_tag structures to AST and paths
@@ -102,42 +101,37 @@ def _db_tags_to_leaf_paths(file_tags: Sequence[FileTagNode]) -> set[tuple[str, .
     return set(_ast_to_leaf_paths(_db_to_ast(file_tags)))
 
 
-def attach_tree(
-    conn: Connection, file_id: int, node: Expr, parent_id: int | None = None
-):
+def attach_tree(vault: Vault, file_id: int, node: Expr, parent_id: int | None = None):
     match node:
         case Tag(name, None):
-            tag = crud.tag.get_or_create(conn, name)
-            crud.file_tag.attach(conn, file_id, tag.id, parent_id)
+            tag = vault.tags.get_or_create(name)
+            vault.file_tags.attach(file_id, tag.id, parent_id)
         case Tag(name, children):
             assert children is not None  # for mypy
-            tag = crud.tag.get_or_create(conn, name)
-            filetag_id = crud.file_tag.attach(conn, file_id, tag.id, parent_id)
-            attach_tree(conn, file_id, children, filetag_id)
+            tag = vault.tags.get_or_create(name)
+            filetag_id = vault.file_tags.attach(file_id, tag.id, parent_id)
+            attach_tree(vault, file_id, children, filetag_id)
         case And(operands):
             for op in operands:
-                attach_tree(conn, file_id, op, parent_id)
+                attach_tree(vault, file_id, op, parent_id)
 
 
 def add_tags_to_files(
-    conn: Connection,
+    vault: Vault,
     files: Sequence[Path],
     tags: Expr,
     apply_tagalongs: bool = True,
 ):
-    file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
+    file_ids = [x.id for x in vault.files.get_or_create_many(files)]
 
     for file_id in file_ids:
-        attach_tree(conn, file_id, tags)
+        attach_tree(vault, file_id, tags)
 
     if apply_tagalongs:
-        crud.tagalong.apply(
-            conn,
-            file_ids,
-        )
+        vault.tagalongs.apply(file_ids)
 
 
-def get_file_tag_nodes(conn: Connection, file_ids: list[int]) -> list[FileTagNode]:
+def get_file_tag_nodes(vault: Vault, file_ids: list[int]) -> list[FileTagNode]:
     if not file_ids:
         return []
 
@@ -154,27 +148,27 @@ def get_file_tag_nodes(conn: Connection, file_ids: list[int]) -> list[FileTagNod
         WHERE file_tag.file_id IN ({placeholders})
         ORDER BY file_id, parent_id, name
     """
-    return [FileTagNode(**row) for row in conn.execute(q, file_ids).fetchall()]
+    return [FileTagNode(**row) for row in vault.conn.execute(q, file_ids).fetchall()]
 
 
-def remove_tags_from_files(conn: Connection, files: Sequence[Path], tags: Expr):
+def remove_tags_from_files(vault: Vault, files: Sequence[Path], tags: Expr):
 
     # remove only leafs
     unwanted = set(_ast_to_leaf_paths(tags))
 
     # fetch files and their tags
-    file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
-    db_tags = get_file_tag_nodes(conn, file_ids)
+    file_ids = [x.id for x in vault.files.get_or_create_many(files)]
+    db_tags = get_file_tag_nodes(vault, file_ids)
 
     existing_paths = _paths_by_id(db_tags)
 
     for ft_id, path in existing_paths.items():
         if path in unwanted:
-            crud.file_tag.detach(conn, ft_id)
+            vault.file_tags.detach(ft_id)
 
 
 def set_tags_on_files(
-    conn: Connection,
+    vault: Vault,
     files: Sequence[Path],
     tags: Expr,
     apply_tagalongs: bool = True,
@@ -183,8 +177,8 @@ def set_tags_on_files(
     keep = _ast_to_path_closure(tags)
 
     # fetch files and their tags
-    file_ids = [x.id for x in crud.file.get_or_create_many(conn, files)]
-    db_tags = get_file_tag_nodes(conn, file_ids)
+    file_ids = [x.id for x in vault.files.get_or_create_many(files)]
+    db_tags = get_file_tag_nodes(vault, file_ids)
 
     # materialized path to every node, keyed by file_tag id
     existing_paths = _paths_by_id(db_tags)
@@ -195,25 +189,25 @@ def set_tags_on_files(
         # - its parent shall be kept, i.e. this is the topmost
         #   node to delete in its branch
         if path not in keep and (len(path) == 1 or path[:-1] in keep):
-            crud.file_tag.detach(conn, ft_id)
+            vault.file_tags.detach(ft_id)
 
     # attach new tags - done after removal so new tagalongs aren't nuked.
     # add_tags_to_files evaluates ´tags´ as well, so there's a bit of double work here.
-    add_tags_to_files(conn, files, tags, apply_tagalongs)
+    add_tags_to_files(vault, files, tags, apply_tagalongs)
 
 
-def drop_file_tags(conn: Connection, files: Sequence[Path], retain_file: bool = False):
-    file_ids = [x.id for x in crud.file.get_many_by_path(conn, files)]
+def drop_file_tags(vault: Vault, files: Sequence[Path], retain_file: bool = False):
+    file_ids = [x.id for x in vault.files.get_many_by_path(files)]
     for file_id in file_ids:
-        crud.file_tag.drop_for_file(conn, file_id)
+        vault.file_tags.drop_for_file(file_id)
 
         if not retain_file:
-            crud.file.delete(conn, file_id)
+            vault.files.delete(file_id)
 
 
-def lookup_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
+def lookup_tags(vault: Vault, files: Sequence[File]) -> list[TaggedFile]:
     ids = [file.id for file in files]
-    tags = get_file_tag_nodes(conn, ids)
+    tags = get_file_tag_nodes(vault, ids)
 
     # tags are ordered by file id so we can groupby safely
     lookup = {k: list(v) for k, v in groupby(tags, key=lambda x: x.file_id)}
@@ -222,7 +216,7 @@ def lookup_tags(conn: Connection, files: Sequence[File]) -> list[TaggedFile]:
 
 
 def list_files(
-    conn: Connection,
+    vault: Vault,
     select: Expr | None,
     exclude: Expr | None,
     ignore_tag_case: bool,
@@ -232,11 +226,11 @@ def list_files(
     long: bool,
 ) -> list[TaggedFile]:
     files = execute_query(
-        conn, select, exclude, ignore_tag_case, pattern, ignore_case, invert_match
+        vault, select, exclude, ignore_tag_case, pattern, ignore_case, invert_match
     )
 
     if long:
-        files_with_tags = lookup_tags(conn, files)
+        files_with_tags = lookup_tags(vault, files)
     else:
         files_with_tags = [TaggedFile(f, None) for f in files]
 
@@ -244,7 +238,7 @@ def list_files(
 
 
 def execute_query(
-    conn: Connection,
+    vault: Vault,
     select: Expr | None,
     exclude: Expr | None,
     ignore_tag_case: bool = False,
@@ -259,14 +253,14 @@ def execute_query(
     if query_expr:
         # pass lambdafunc to let dependent funcs to get file ids lazily
         ids = search(
-            conn,
+            vault.conn,
             query_expr,
-            lambda: {x.id for x in crud.file.get_all(conn)},
+            lambda: {x.id for x in vault.files.get_all()},
             not ignore_tag_case,
         )
-        files = crud.file.get_many(conn, list(ids))
+        files = vault.files.get_many(list(ids))
     else:
-        files = crud.file.get_all(conn)
+        files = vault.files.get_all()
 
     matcher = compile_matcher(pattern, ignore_case, invert_match)
 
@@ -276,7 +270,7 @@ def execute_query(
     )
 
 
-def relocate_file(conn: Connection, file: File, search_root: Path) -> None:
+def relocate_file(vault: Vault, file: File, search_root: Path) -> None:
     """Finds a file by inode/device and updates its path."""
     target_inode = file.inode
     target_device = file.device
@@ -288,13 +282,13 @@ def relocate_file(conn: Connection, file: File, search_root: Path) -> None:
         stat = path.stat()
 
         if stat.st_ino == target_inode and stat.st_dev == target_device:
-            crud.file.update(conn, file.id, path, stat.st_ino, stat.st_dev)
+            vault.files.update(file.id, path, stat.st_ino, stat.st_dev)
 
 
-def list_tagalong_names(conn: Connection) -> list[TagalongNames]:
-    result = conn.execute("""
+def list_tagalong_names(vault: Vault) -> list[TagalongNames]:
+    result = vault.conn.execute("""
         SELECT
-            t.name tag_name, 
+            t.name tag_name,
             ta.name tagalong_name
         FROM tagalong
         JOIN tag t on tagalong.tag_id = t.id

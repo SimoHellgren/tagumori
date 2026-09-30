@@ -12,7 +12,8 @@ def _placeholders(count: int, placeholder: str = "?"):
 class BaseCRUD[T: RowModel]:
     """A Baseclass with implementations of the most common shared logic."""
 
-    def __init__(self, table: str, unique_col: str, model: type[T]):
+    def __init__(self, conn: Connection, table: str, unique_col: str, model: type[T]):
+        self._conn = conn
         self.table = table
         self.unique_col = unique_col
         self.model = model
@@ -34,43 +35,43 @@ class BaseCRUD[T: RowModel]:
         """Utility for transforming many Rows to output model"""
         return [x for x in map(self._one, items) if x is not None]
 
-    def get_all(self, conn: Connection) -> list[T]:
+    def get_all(self) -> list[T]:
         return self._many(
-            conn.execute(f"SELECT * FROM {self.table}").fetchall(),
+            self._conn.execute(f"SELECT * FROM {self.table}").fetchall(),
         )
 
-    def get(self, conn: Connection, id: int) -> T | None:
+    def get(self, id: int) -> T | None:
         return self._one(
-            conn.execute(f"SELECT * FROM {self.table} WHERE id = ?", (id,)).fetchone()
+            self._conn.execute(
+                f"SELECT * FROM {self.table} WHERE id = ?", (id,)
+            ).fetchone()
         )
 
-    def get_many(self, conn: Connection, ids: Sequence[int]) -> list[T]:
+    def get_many(self, ids: Sequence[int]) -> list[T]:
         phs = _placeholders(len(ids))
 
         return self._many(
-            conn.execute(
+            self._conn.execute(
                 f"SELECT * FROM {self.table} WHERE id IN ({phs})", ids
             ).fetchall()
         )
 
-    def get_by_unique_col(self, conn: Connection, value: Any) -> T | None:
+    def get_by_unique_col(self, value: Any) -> T | None:
         # TODO: should change to a generic type var here instead of Any
 
         return self._one(
-            conn.execute(
+            self._conn.execute(
                 f"SELECT * FROM {self.table} WHERE {self.unique_col} = ?", (value,)
             ).fetchone()
         )
 
-    def get_many_by_unique_col(
-        self, conn: Connection, values: Sequence[Any]
-    ) -> list[T]:
+    def get_many_by_unique_col(self, values: Sequence[Any]) -> list[T]:
         phs = _placeholders(len(values))
         return self._many(
-            conn.execute(
+            self._conn.execute(
                 f"SELECT * FROM {self.table} WHERE {self.unique_col} IN ({phs})", values
             ).fetchall()
         )
 
-    def delete(self, conn: Connection, id: int) -> None:
-        conn.execute(f"DELETE FROM {self.table} WHERE id = ?", (id,))
+    def delete(self, id: int) -> None:
+        self._conn.execute(f"DELETE FROM {self.table} WHERE id = ?", (id,))

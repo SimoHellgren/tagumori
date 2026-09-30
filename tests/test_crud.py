@@ -3,58 +3,57 @@ from pathlib import Path
 import pytest
 
 import tagumori.service
-from tagumori import crud
 from tagumori.crud.file import _get_inode_and_device
 from tests.helpers import not_none
 
 
 class TestTagCRUD:
-    def test_create(self, conn):
-        row = crud.tag.create(conn, "rock", "genre")
+    def test_create(self, vault):
+        row = vault.tags.create("rock", "genre")
 
         assert row.name == "rock"
         assert row.category == "genre"
         assert row.id is not None
 
-    def test_create_without_category(self, conn):
-        row = crud.tag.create(conn, "rock")
+    def test_create_without_category(self, vault):
+        row = vault.tags.create("rock")
 
         assert row.name == "rock"
         assert row.category is None
         assert row.id is not None
 
-    def test_get_by_name(self, conn):
-        crud.tag.create(conn, "rock")
+    def test_get_by_name(self, vault):
+        vault.tags.create("rock")
 
-        row = not_none(crud.tag.get_by_name(conn, "rock"))
+        row = not_none(vault.tags.get_by_name("rock"))
 
         assert row.name == "rock"
 
-    def test_get_by_name_not_found(self, conn):
-        row = crud.tag.get_by_name(conn, "this doesn't exist!")
+    def test_get_by_name_not_found(self, vault):
+        row = vault.tags.get_by_name("this doesn't exist!")
 
         assert row is None
 
-    def test_get_many_by_name(self, conn):
-        crud.tag.create(conn, "rock")
-        crud.tag.create(conn, "opera")
-        crud.tag.create(conn, "jazz")
+    def test_get_many_by_name(self, vault):
+        vault.tags.create("rock")
+        vault.tags.create("opera")
+        vault.tags.create("jazz")
 
-        rows = crud.tag.get_many_by_name(conn, ["rock", "opera"])
+        rows = vault.tags.get_many_by_name(["rock", "opera"])
 
         assert len(rows) == 2
         assert {"rock", "opera"} == {r.name for r in rows}
 
-    def test_get_many_by_name_empty(self, conn):
-        rows = crud.tag.get_many_by_name(conn, [])
+    def test_get_many_by_name_empty(self, vault):
+        rows = vault.tags.get_many_by_name([])
 
         assert rows == []
 
-    def test_get_many_by_name_missing(self, conn):
-        crud.tag.create(conn, "rock")
-        crud.tag.create(conn, "opera")
+    def test_get_many_by_name_missing(self, vault):
+        vault.tags.create("rock")
+        vault.tags.create("opera")
 
-        rows = crud.tag.get_many_by_name(conn, ["rock", "jazz"])
+        rows = vault.tags.get_many_by_name(["rock", "jazz"])
 
         names = {r.name for r in rows}
 
@@ -63,73 +62,73 @@ class TestTagCRUD:
         assert "opera" not in names
         assert "jazz" not in names
 
-    def test_get_or_create_creates(self, conn):
-        row = crud.tag.get_or_create(conn, "rock")
+    def test_get_or_create_creates(self, vault):
+        row = vault.tags.get_or_create("rock")
 
         assert row.name == "rock"
 
-    def test_get_or_create_idempotent(self, conn):
-        row1 = crud.tag.get_or_create(conn, "rock")
-        row2 = crud.tag.get_or_create(conn, "rock")
+    def test_get_or_create_idempotent(self, vault):
+        row1 = vault.tags.get_or_create("rock")
+        row2 = vault.tags.get_or_create("rock")
 
         assert row1.id == row2.id
 
-    def test_get_or_create_many(self, conn):
-        rows = crud.tag.get_or_create_many(conn, ["rock", "jazz"])
+    def test_get_or_create_many(self, vault):
+        rows = vault.tags.get_or_create_many(["rock", "jazz"])
 
         assert len(rows) == 2
 
-    def test_get_or_create_many_idempotent(self, conn):
-        rows1 = crud.tag.get_or_create_many(conn, ["rock", "jazz"])
-        rows2 = crud.tag.get_or_create_many(conn, ["rock", "jazz"])
+    def test_get_or_create_many_idempotent(self, vault):
+        rows1 = vault.tags.get_or_create_many(["rock", "jazz"])
+        rows2 = vault.tags.get_or_create_many(["rock", "jazz"])
 
         ids1 = {r.id for r in rows1}
         ids2 = {r.id for r in rows2}
         assert ids1 == ids2
 
-    def test_get_all(self, conn):
-        crud.tag.create(conn, "rock")
-        crud.tag.create(conn, "jazz")
+    def test_get_all(self, vault):
+        vault.tags.create("rock")
+        vault.tags.create("jazz")
 
-        rows = crud.tag.get_all(conn)
+        rows = vault.tags.get_all()
 
         assert len(rows) == 2
 
-    def test_get_all_empty(self, conn):
-        rows = crud.tag.get_all(conn)
+    def test_get_all_empty(self, vault):
+        rows = vault.tags.get_all()
 
         assert rows == []
 
-    def test_update_single(self, conn):
-        crud.tag.create(conn, "rock")
+    def test_update_single(self, vault):
+        vault.tags.create("rock")
 
-        crud.tag.update(conn, ["rock"], {"category": "genre"})
+        vault.tags.update(["rock"], {"category": "genre"})
 
-        row = not_none(crud.tag.get_by_name(conn, "rock"))
+        row = not_none(vault.tags.get_by_name("rock"))
         assert row.category == "genre"
 
-    def test_update_multiple(self, conn):
-        crud.tag.create(conn, "rock")
-        crud.tag.create(conn, "jazz")
+    def test_update_multiple(self, vault):
+        vault.tags.create("rock")
+        vault.tags.create("jazz")
 
-        crud.tag.update(conn, ["rock", "jazz"], {"category": "genre"})
+        vault.tags.update(["rock", "jazz"], {"category": "genre"})
 
         for name in ["rock", "jazz"]:
-            row = not_none(crud.tag.get_by_name(conn, name))
+            row = not_none(vault.tags.get_by_name(name))
             assert row.category == "genre"
 
-    def test_update_forbidden_column(self, conn):
-        crud.tag.create(conn, "rock")
+    def test_update_forbidden_column(self, vault):
+        vault.tags.create("rock")
 
         with pytest.raises(ValueError, match="Forbidden column"):
-            crud.tag.update(conn, ["rock"], {"id": 999})
+            vault.tags.update(["rock"], {"id": 999})
 
-    def test_delete(self, conn):
-        row = crud.tag.create(conn, "rock")
+    def test_delete(self, vault):
+        row = vault.tags.create("rock")
 
-        crud.tag.delete(conn, row.id)
+        vault.tags.delete(row.id)
 
-        assert crud.tag.get_by_name(conn, "rock") is None
+        assert vault.tags.get_by_name("rock") is None
 
 
 class TestFileCRUD:
@@ -150,101 +149,101 @@ class TestFileCRUD:
         assert inode is None
         assert device is None
 
-    def test_get_or_create(self, conn):
-        row = crud.file.get_or_create(conn, Path("foo.txt"))
+    def test_get_or_create(self, vault):
+        row = vault.files.get_or_create(Path("foo.txt"))
 
         assert row.id is not None
 
-    def test_get_or_create_idempotent(self, conn):
-        row1 = crud.file.get_or_create(conn, Path("foo.txt"))
-        row2 = crud.file.get_or_create(conn, Path("foo.txt"))
+    def test_get_or_create_idempotent(self, vault):
+        row1 = vault.files.get_or_create(Path("foo.txt"))
+        row2 = vault.files.get_or_create(Path("foo.txt"))
 
         assert row1.id == row2.id
 
-    def test_get_by_path(self, conn):
-        crud.file.get_or_create(conn, Path("foo.txt"))
+    def test_get_by_path(self, vault):
+        vault.files.get_or_create(Path("foo.txt"))
 
-        row = crud.file.get_by_path(conn, Path("foo.txt"))
+        row = vault.files.get_by_path(Path("foo.txt"))
 
         assert row is not None
 
-    def test_get_by_path_not_found(self, conn):
-        row = crud.file.get_by_path(conn, Path("nonexistent.txt"))
+    def test_get_by_path_not_found(self, vault):
+        row = vault.files.get_by_path(Path("nonexistent.txt"))
 
         assert row is None
 
-    def test_get_many_by_path(self, conn):
-        crud.file.get_or_create(conn, Path("a.txt"))
-        crud.file.get_or_create(conn, Path("b.txt"))
+    def test_get_many_by_path(self, vault):
+        vault.files.get_or_create(Path("a.txt"))
+        vault.files.get_or_create(Path("b.txt"))
 
-        rows = crud.file.get_many_by_path(conn, [Path("a.txt"), Path("b.txt")])
-
-        assert len(rows) == 2
-
-    def test_get_or_create_many(self, conn):
-        rows = crud.file.get_or_create_many(conn, [Path("a.txt"), Path("b.txt")])
+        rows = vault.files.get_many_by_path([Path("a.txt"), Path("b.txt")])
 
         assert len(rows) == 2
 
-    def test_delete(self, conn):
-        row = crud.file.get_or_create(conn, Path("foo.txt"))
+    def test_get_or_create_many(self, vault):
+        rows = vault.files.get_or_create_many([Path("a.txt"), Path("b.txt")])
 
-        crud.file.delete(conn, row.id)
+        assert len(rows) == 2
 
-        assert crud.file.get_by_path(conn, Path("foo.txt")) is None
+    def test_delete(self, vault):
+        row = vault.files.get_or_create(Path("foo.txt"))
 
-    def test_get_or_create_stores_inode_and_device(self, conn, tmp_path):
+        vault.files.delete(row.id)
+
+        assert vault.files.get_by_path(Path("foo.txt")) is None
+
+    def test_get_or_create_stores_inode_and_device(self, vault, tmp_path):
         """When adding a real file, inode and device should be stored."""
         real_file = tmp_path / "real.txt"
         real_file.write_text("content")
 
-        crud.file.get_or_create(conn, real_file)
+        vault.files.get_or_create(real_file)
 
         # Re-fetch to get all columns
-        fetched = not_none(crud.file.get_by_path(conn, real_file))
+        fetched = not_none(vault.files.get_by_path(real_file))
         stat = real_file.stat()
 
         assert fetched.inode == stat.st_ino
         assert fetched.device == stat.st_dev
 
-    def test_get_or_create_many_stores_inode_and_device(self, conn, tmp_path):
+    def test_get_or_create_many_stores_inode_and_device(self, vault, tmp_path):
         """When adding multiple real files, inode and device should be stored for each."""
         file1 = tmp_path / "a.txt"
         file2 = tmp_path / "b.txt"
         file1.write_text("a")
         file2.write_text("b")
 
-        crud.file.get_or_create_many(conn, [file1, file2])
+        vault.files.get_or_create_many([file1, file2])
 
         for path in [file1, file2]:
-            fetched = not_none(crud.file.get_by_path(conn, path))
+            fetched = not_none(vault.files.get_by_path(path))
             stat = path.stat()
             assert fetched.inode == stat.st_ino
             assert fetched.device == stat.st_dev
 
-    def test_inode_device_null_for_nonexistent_path(self, conn):
+    def test_inode_device_null_for_nonexistent_path(self, vault):
         """For paths that don't exist on disk, inode/device should be null."""
-        crud.file.get_or_create(conn, Path("nonexistent.txt"))
+        vault.files.get_or_create(Path("nonexistent.txt"))
 
         fetched = not_none(
-            crud.file.get_by_path(conn, Path("nonexistent.txt").resolve())
+            vault.files.get_by_path(Path("nonexistent.txt").resolve())
         )
 
         assert fetched.inode is None
         assert fetched.device is None
 
-    def test_get_or_create_stores_absolute_path(self, conn, tmp_path):
+    def test_get_or_create_stores_absolute_path(self, vault, tmp_path):
         """Paths should be stored as absolute (resolved) paths."""
         real_file = tmp_path / "file.txt"
         real_file.write_text("content")
 
-        crud.file.get_or_create(conn, real_file)
+        vault.files.get_or_create(real_file)
 
-        fetched = not_none(crud.file.get_by_path(conn, real_file))
+        fetched = not_none(vault.files.get_by_path(real_file))
 
         assert fetched.path == real_file.resolve()
 
-    def test_get_or_create_resolves_relative_path(self, conn, tmp_path, monkeypatch):
+    def test_get_or_create_resolves_relative_path(self, vault, tmp_path, monkeypatch):
         """Relative paths should be resolved to absolute before storing."""
         # Change to tmp_path so relative paths resolve there
         monkeypatch.chdir(tmp_path)
@@ -253,26 +252,26 @@ class TestFileCRUD:
         real_file.write_text("content")
 
         # Pass a relative path
-        crud.file.get_or_create(conn, Path("relative_test.txt"))
+        vault.files.get_or_create(Path("relative_test.txt"))
 
         # Should be stored as absolute
-        fetched = crud.file.get_by_path(conn, Path("relative_test.txt").resolve())
+        fetched = vault.files.get_by_path(Path("relative_test.txt").resolve())
 
         assert fetched is not None
         assert fetched.path == real_file.resolve()
         assert fetched.path.is_absolute()
 
-    def test_get_or_create_many_stores_absolute_paths(self, conn, tmp_path):
+    def test_get_or_create_many_stores_absolute_paths(self, vault, tmp_path):
         """Multiple paths should all be stored as absolute."""
         file1 = tmp_path / "a.txt"
         file2 = tmp_path / "b.txt"
         file1.write_text("a")
         file2.write_text("b")
 
-        crud.file.get_or_create_many(conn, [file1, file2])
+        vault.files.get_or_create_many([file1, file2])
 
         for path in [file1, file2]:
-            fetched = crud.file.get_by_path(conn, path.resolve())
+            fetched = vault.files.get_by_path(path.resolve())
             assert fetched is not None
             assert fetched.path == path.resolve()
             assert fetched.path.is_absolute()
@@ -280,71 +279,71 @@ class TestFileCRUD:
 
 class TestFileTag:
     @pytest.fixture
-    def file_and_tag(self, conn, make_tag):
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
+    def file_and_tag(self, vault, make_tag):
+        file_row = vault.files.get_or_create(Path("test.txt"))
         tag_row = make_tag()
         return file_row.id, tag_row.id
 
-    def test_attach(self, conn, file_and_tag):
+    def test_attach(self, vault, file_and_tag):
         file_id, tag_id = file_and_tag
 
-        file_tag_id = crud.file_tag.attach(conn, file_id, tag_id)
+        file_tag_id = vault.file_tags.attach(file_id, tag_id)
 
         assert file_tag_id is not None
 
-    def test_attach_idempotent(self, conn, file_and_tag):
+    def test_attach_idempotent(self, vault, file_and_tag):
         file_id, tag_id = file_and_tag
 
-        id1 = crud.file_tag.attach(conn, file_id, tag_id)
-        id2 = crud.file_tag.attach(conn, file_id, tag_id)
+        id1 = vault.file_tags.attach(file_id, tag_id)
+        id2 = vault.file_tags.attach(file_id, tag_id)
 
         assert id1 == id2
 
-    def test_attach_with_parent(self, conn, file_and_tag):
+    def test_attach_with_parent(self, vault, file_and_tag):
         file_id, tag_id = file_and_tag
-        child_tag = crud.tag.create(conn, "classic")
+        child_tag = vault.tags.create("classic")
 
-        parent_id = crud.file_tag.attach(conn, file_id, tag_id)
-        child_id = crud.file_tag.attach(conn, file_id, child_tag.id, parent_id)
+        parent_id = vault.file_tags.attach(file_id, tag_id)
+        child_id = vault.file_tags.attach(file_id, child_tag.id, parent_id)
 
         assert child_id is not None
         assert child_id != parent_id
 
-    def test_detach(self, conn, file_and_tag):
+    def test_detach(self, vault, file_and_tag):
         file_id, tag_id = file_and_tag
-        file_tag_id = crud.file_tag.attach(conn, file_id, tag_id)
+        file_tag_id = vault.file_tags.attach(file_id, tag_id)
 
-        crud.file_tag.detach(conn, file_tag_id)
+        vault.file_tags.detach(file_tag_id)
 
-        rows = tagumori.service.get_file_tag_nodes(conn, [file_id])
+        rows = tagumori.service.get_file_tag_nodes(vault, [file_id])
         assert rows == []
 
-    def test_get_by_file_id(self, conn, file_and_tag):
+    def test_get_by_file_id(self, vault, file_and_tag):
         file_id, tag_id = file_and_tag
-        crud.file_tag.attach(conn, file_id, tag_id)
+        vault.file_tags.attach(file_id, tag_id)
 
-        rows = tagumori.service.get_file_tag_nodes(conn, [file_id])
+        rows = tagumori.service.get_file_tag_nodes(vault, [file_id])
 
         assert len(rows) == 1
         assert rows[0].tag_name == "rock"
 
-    def test_drop_for_file(self, conn, file_and_tag):
+    def test_drop_for_file(self, vault, file_and_tag):
         file_id, tag_id = file_and_tag
-        crud.file_tag.attach(conn, file_id, tag_id)
+        vault.file_tags.attach(file_id, tag_id)
 
-        crud.file_tag.drop_for_file(conn, file_id)
+        vault.file_tags.drop_for_file(file_id)
 
-        rows = tagumori.service.get_file_tag_nodes(conn, [file_id])
+        rows = tagumori.service.get_file_tag_nodes(vault, [file_id])
         assert rows == []
 
-    def test_replace(self, conn, file_and_tag):
+    def test_replace(self, vault, file_and_tag):
         file_id, tag_id = file_and_tag
-        new_tag = crud.tag.create(conn, "jazz")
-        crud.file_tag.attach(conn, file_id, tag_id)
+        new_tag = vault.tags.create("jazz")
+        vault.file_tags.attach(file_id, tag_id)
 
-        crud.file_tag.replace(conn, tag_id, new_tag.id)
+        vault.file_tags.replace(tag_id, new_tag.id)
 
-        rows = tagumori.service.get_file_tag_nodes(conn, [file_id])
+        rows = tagumori.service.get_file_tag_nodes(vault, [file_id])
         assert rows[0].tag_name == "jazz"
 
 
@@ -355,62 +354,62 @@ class TestTagalong:
         t2 = make_tag("guitar")
         return t1.id, t2.id
 
-    def test_create(self, conn, two_tags):
+    def test_create(self, vault, two_tags):
         source_id, target_id = two_tags
 
-        crud.tagalong.create(conn, source_id, target_id)
+        vault.tagalongs.create(source_id, target_id)
 
-        rows = tagumori.service.list_tagalong_names(conn)
+        rows = tagumori.service.list_tagalong_names(vault)
         assert len(rows) == 1
         assert rows[0].tag_name == "rock"
         assert rows[0].tagalong_name == "guitar"
 
-    def test_create_idempotent(self, conn, two_tags):
+    def test_create_idempotent(self, vault, two_tags):
         source_id, target_id = two_tags
 
-        crud.tagalong.create(conn, source_id, target_id)
-        crud.tagalong.create(conn, source_id, target_id)
+        vault.tagalongs.create(source_id, target_id)
+        vault.tagalongs.create(source_id, target_id)
 
-        rows = tagumori.service.list_tagalong_names(conn)
+        rows = tagumori.service.list_tagalong_names(vault)
         assert len(rows) == 1
 
-    def test_delete(self, conn, two_tags):
+    def test_delete(self, vault, two_tags):
         source_id, target_id = two_tags
-        crud.tagalong.create(conn, source_id, target_id)
+        vault.tagalongs.create(source_id, target_id)
 
-        crud.tagalong.delete(conn, source_id, target_id)
+        vault.tagalongs.delete(source_id, target_id)
 
-        rows = tagumori.service.list_tagalong_names(conn)
+        rows = tagumori.service.list_tagalong_names(vault)
         assert rows == []
 
-    def test_apply(self, conn, two_tags):
+    def test_apply(self, vault, two_tags):
         source_id, target_id = two_tags
-        crud.tagalong.create(conn, source_id, target_id)
+        vault.tagalongs.create(source_id, target_id)
 
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        crud.file_tag.attach(conn, file_row.id, source_id)
+        file_row = vault.files.get_or_create(Path("test.txt"))
+        vault.file_tags.attach(file_row.id, source_id)
 
-        crud.tagalong.apply(conn, [file_row.id])
+        vault.tagalongs.apply([file_row.id])
 
-        rows = tagumori.service.get_file_tag_nodes(conn, [file_row.id])
+        rows = tagumori.service.get_file_tag_nodes(vault, [file_row.id])
         tag_names = {r.tag_name for r in rows}
         assert tag_names == {"rock", "guitar"}
 
-    def test_apply_transitive(self, conn):
+    def test_apply_transitive(self, vault):
         """Test that tagalongs are applied transitively: A->B->C"""
-        a = crud.tag.create(conn, "A")
-        b = crud.tag.create(conn, "B")
-        c = crud.tag.create(conn, "C")
+        a = vault.tags.create("A")
+        b = vault.tags.create("B")
+        c = vault.tags.create("C")
 
-        crud.tagalong.create(conn, a.id, b.id)
-        crud.tagalong.create(conn, b.id, c.id)
+        vault.tagalongs.create(a.id, b.id)
+        vault.tagalongs.create(b.id, c.id)
 
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        crud.file_tag.attach(conn, file_row.id, a.id)
+        file_row = vault.files.get_or_create(Path("test.txt"))
+        vault.file_tags.attach(file_row.id, a.id)
 
-        crud.tagalong.apply(conn, [file_row.id])
+        vault.tagalongs.apply([file_row.id])
 
-        rows = tagumori.service.get_file_tag_nodes(conn, [file_row.id])
+        rows = tagumori.service.get_file_tag_nodes(vault, [file_row.id])
         tag_names = {r.tag_name for r in rows}
         assert tag_names == {"A", "B", "C"}
 
@@ -426,20 +425,20 @@ class TestTagalong:
             pytest.param(["A"], [("A", "A")], id="self_referential"),
         ],
     )
-    def test_circular_tagalong_terminates(self, conn, names, edges):
+    def test_circular_tagalong_terminates(self, vault, names, edges):
         """A cycle in the tagalong graph must not cause apply() to loop
         infinitely, and should still resolve to every tag in the cycle."""
-        tags = {name: crud.tag.create(conn, name) for name in names}
+        tags = {name: vault.tags.create(name) for name in names}
         for source, target in edges:
-            crud.tagalong.create(conn, tags[source].id, tags[target].id)
+            vault.tagalongs.create(tags[source].id, tags[target].id)
 
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        crud.file_tag.attach(conn, file_row.id, tags[names[0]].id)
+        file_row = vault.files.get_or_create(Path("test.txt"))
+        vault.file_tags.attach(file_row.id, tags[names[0]].id)
 
         # Should complete without hanging
-        crud.tagalong.apply(conn, [file_row.id])
+        vault.tagalongs.apply([file_row.id])
 
-        rows = tagumori.service.get_file_tag_nodes(conn, [file_row.id])
+        rows = tagumori.service.get_file_tag_nodes(vault, [file_row.id])
         tag_names = {r.tag_name for r in rows}
         assert tag_names == set(names)
 
@@ -447,41 +446,41 @@ class TestTagalong:
 class TestCascadeDeletes:
     """Test that foreign key cascades work correctly."""
 
-    def test_delete_file_cascades_to_file_tag(self, conn):
+    def test_delete_file_cascades_to_file_tag(self, vault):
         """Deleting a file should delete its file_tags."""
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        tag_row = crud.tag.create(conn, "rock")
-        crud.file_tag.attach(conn, file_row.id, tag_row.id)
+        file_row = vault.files.get_or_create(Path("test.txt"))
+        tag_row = vault.tags.create("rock")
+        vault.file_tags.attach(file_row.id, tag_row.id)
 
-        crud.file.delete(conn, file_row.id)
+        vault.files.delete(file_row.id)
 
         # file_tag should be gone
-        rows = conn.execute("SELECT * FROM file_tag").fetchall()
+        rows = vault.conn.execute("SELECT * FROM file_tag").fetchall()
         assert rows == []
 
-    def test_delete_tag_cascades_to_file_tag(self, conn):
+    def test_delete_tag_cascades_to_file_tag(self, vault):
         """Deleting a tag should delete its file_tags."""
-        file_row = crud.file.get_or_create(conn, Path("test.txt"))
-        tag_row = crud.tag.create(conn, "rock")
-        crud.file_tag.attach(conn, file_row.id, tag_row.id)
+        file_row = vault.files.get_or_create(Path("test.txt"))
+        tag_row = vault.tags.create("rock")
+        vault.file_tags.attach(file_row.id, tag_row.id)
 
-        crud.tag.delete(conn, tag_row.id)
+        vault.tags.delete(tag_row.id)
 
         # file_tag should be gone
-        rows = tagumori.service.get_file_tag_nodes(conn, [file_row.id])
+        rows = tagumori.service.get_file_tag_nodes(vault, [file_row.id])
         assert rows == []
         # file should still exist
-        assert crud.file.get_by_path(conn, Path("test.txt")) is not None
+        assert vault.files.get_by_path(Path("test.txt")) is not None
 
-    def test_delete_tag_cascades_to_tagalong(self, conn):
+    def test_delete_tag_cascades_to_tagalong(self, vault):
         """Deleting a tag should delete its tagalong relationships."""
-        t1 = crud.tag.create(conn, "rock")
-        t2 = crud.tag.create(conn, "guitar")
-        crud.tagalong.create(conn, t1.id, t2.id)
+        t1 = vault.tags.create("rock")
+        t2 = vault.tags.create("guitar")
+        vault.tagalongs.create(t1.id, t2.id)
 
-        crud.tag.delete(conn, t1.id)
+        vault.tags.delete(t1.id)
 
-        rows = tagumori.service.list_tagalong_names(conn)
+        rows = tagumori.service.list_tagalong_names(vault)
         assert rows == []
 
     @pytest.mark.parametrize(
@@ -508,15 +507,15 @@ class TestCascadeDeletes:
         ],
     )
     def test_detach_cascades_down_the_tree(
-        self, conn, make_tagged_file, tag_names, detach_name, expected_remaining
+        self, vault, make_tagged_file, tag_names, detach_name, expected_remaining
     ):
         """Detaching a file_tag should cascade to its descendants, while
         leaving its ancestors (and siblings) untouched."""
         fid = make_tagged_file("test.txt", [tag_names])
-        rows = tagumori.service.get_file_tag_nodes(conn, [fid])
+        rows = tagumori.service.get_file_tag_nodes(vault, [fid])
         ft_id_by_name = {r.tag_name: r.id for r in rows}
 
-        crud.file_tag.detach(conn, ft_id_by_name[detach_name])
+        vault.file_tags.detach(ft_id_by_name[detach_name])
 
-        remaining = tagumori.service.get_file_tag_nodes(conn, [fid])
+        remaining = tagumori.service.get_file_tag_nodes(vault, [fid])
         assert [r.tag_name for r in remaining] == expected_remaining

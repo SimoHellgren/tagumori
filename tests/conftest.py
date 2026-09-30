@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from tagumori import crud
 from tagumori.db.init import SCHEMA_PATH
 from tagumori.db.migrations import migrate
 from tagumori.models import Tag
+from tagumori.vault import Vault
 
 
 @pytest.fixture
@@ -19,6 +19,11 @@ def conn() -> Generator[sqlite3.Connection]:
     migrate(conn)
     yield conn
     conn.close()
+
+
+@pytest.fixture
+def vault(conn: sqlite3.Connection) -> Vault:
+    return Vault(conn)
 
 
 @pytest.fixture
@@ -34,15 +39,15 @@ def make_file(tmp_path: Path) -> Callable[..., Path]:
 
 
 @pytest.fixture
-def make_tag(conn: sqlite3.Connection) -> Callable[..., Tag]:
+def make_tag(vault: Vault) -> Callable[..., Tag]:
     def _make(name: str = "rock", category: str | None = None) -> Tag:
-        return crud.tag.create(conn, name, category)
+        return vault.tags.create(name, category)
 
     return _make
 
 
 @pytest.fixture
-def make_tagged_file(conn: sqlite3.Connection) -> Callable[..., int]:
+def make_tagged_file(vault: Vault) -> Callable[..., int]:
     """Creates a file (not necessarily present on disk) and attaches tag trees.
 
     tag_paths is a list of tuples, e.g. [("genre", "rock"), ("mood",)].
@@ -50,12 +55,12 @@ def make_tagged_file(conn: sqlite3.Connection) -> Callable[..., int]:
     """
 
     def _make(path_str: str, tag_paths: list[tuple[str, ...]]) -> int:
-        file_row = crud.file.get_or_create(conn, Path(path_str))
+        file_row = vault.files.get_or_create(Path(path_str))
         for tag_path in tag_paths:
             parent_id = None
             for tag_name in tag_path:
-                tag = crud.tag.get_or_create(conn, tag_name)
-                parent_id = crud.file_tag.attach(conn, file_row.id, tag.id, parent_id)
+                tag = vault.tags.get_or_create(tag_name)
+                parent_id = vault.file_tags.attach(file_row.id, tag.id, parent_id)
         return file_row.id
 
     return _make

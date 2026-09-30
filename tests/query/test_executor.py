@@ -1,4 +1,4 @@
-from tagumori import crud
+from tagumori.crud.file import FileCRUD
 from tagumori.query import parse
 from tagumori.query import search as _search
 from tagumori.query.executor import execute as _execute
@@ -17,7 +17,7 @@ from tagumori.query.planner import (
 
 def get_all_ids(conn):
     """Returns set of all file ids in db"""
-    return {x.id for x in crud.file.get_all(conn)}
+    return {x.id for x in FileCRUD(conn).get_all()}
 
 
 def search(conn, string, case=True):

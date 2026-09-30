@@ -1,7 +1,7 @@
-import sqlite3
 from collections import Counter
 from collections.abc import Callable, Sequence
 from functools import cache, reduce
+from sqlite3 import Connection
 
 from tagumori.query.planner import (
     QP_And,
@@ -27,7 +27,7 @@ def _build_value(segment: Segment):
             return (None, 1, is_root, is_leaf)
 
 
-def find_all(conn, path: Sequence[Segment], case):
+def find_all(conn: Connection, path: Sequence[Segment], case):
     values_ph = ", ".join("(?,?,?,?,?)" for _ in path)
 
     # build values
@@ -96,7 +96,7 @@ def find_all(conn, path: Sequence[Segment], case):
 
 
 def execute(
-    conn: sqlite3.Connection,
+    conn: Connection,
     qp: QueryPlan,
     get_all_ids: Callable[[], set[int]],
     case: bool = True,

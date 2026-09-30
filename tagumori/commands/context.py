@@ -4,6 +4,7 @@ from sqlite3 import Connection
 import click
 
 from tagumori.db.connect import get_vault
+from tagumori.vault import Vault
 
 
 class LazyVault:
@@ -13,6 +14,10 @@ class LazyVault:
         self._path = path
         self._ctx = ctx
         self._conn: Connection | None = None
+
+    @property
+    def path(self) -> Path:
+        return self._path
 
     def _get_conn(self) -> Connection:
         if self._conn is None:
@@ -25,8 +30,10 @@ class LazyVault:
 
         return self._conn
 
-    def __enter__(self) -> Connection:
-        return self._get_conn().__enter__()
+    def __enter__(self) -> Vault:
+        conn = self._get_conn()
+        conn.__enter__()
+        return Vault(conn)
 
     def __exit__(self, *args):
         # self._conn is basically guaranteed to exist, but this makes mypy happy

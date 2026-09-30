@@ -30,18 +30,23 @@ def _get_inode_and_device(path: Path) -> tuple[int | None, int | None]:
 
 
 class FileCRUD(BaseCRUD[File]):
-    def get_by_path(self, conn: Connection, path: Path) -> File | None:
-        return self.get_by_unique_col(conn, str(path.resolve()))
+    def __init__(self, conn: Connection):
+        super().__init__(conn, table="file", unique_col="path", model=File)
 
-    def get_many_by_path(self, conn: Connection, paths: Sequence[Path]) -> list[File]:
-        return self.get_many_by_unique_col(conn, [str(p.resolve()) for p in paths])
+    def get_by_path(self, path: Path) -> File | None:
+        return self.get_by_unique_col(str(path.resolve()))
 
-    def get_by_inode(self, conn: Connection, inode: int) -> list[File]:
+    def get_many_by_path(self, paths: Sequence[Path]) -> list[File]:
+        return self.get_many_by_unique_col([str(p.resolve()) for p in paths])
+
+    def get_by_inode(self, inode: int) -> list[File]:
         return self._many(
-            conn.execute("SELECT * FROM file WHERE inode = ?", (inode,)).fetchall()
+            self._conn.execute(
+                "SELECT * FROM file WHERE inode = ?", (inode,)
+            ).fetchall()
         )
 
-    def get_or_create(self, conn: Connection, path: Path) -> File:
+    def get_or_create(self, path: Path) -> File:
         q = """
                 INSERT INTO file (path, inode, device) VALUES (?,?,?)
                 ON CONFLICT(path) DO UPDATE SET path=path --no-op update
@@ -50,10 +55,10 @@ class FileCRUD(BaseCRUD[File]):
 
         inode, device = _get_inode_and_device(path)
         return self._one_or_raise(
-            conn.execute(q, (str(path.resolve()), inode, device)).fetchone()
+            self._conn.execute(q, (str(path.resolve()), inode, device)).fetchone()
         )
 
-    def get_or_create_many(self, conn: Connection, paths: Sequence[Path]) -> list[File]:
+    def get_or_create_many(self, paths: Sequence[Path]) -> list[File]:
         vals = _placeholders(len(paths), "(?,?,?)")
         q = f"""
                 INSERT INTO file (path, inode, device) VALUES {vals}
@@ -62,15 +67,10 @@ class FileCRUD(BaseCRUD[File]):
             """
         params = [(str(p.resolve()), *_get_inode_and_device(p)) for p in paths]
 
-        return self._many(conn.execute(q, tuple(flatten(params))).fetchall())
+        return self._many(self._conn.execute(q, tuple(flatten(params))).fetchall())
 
-    def update(
-        self, conn: Connection, file_id: int, path: Path, inode: int, device: int
-    ) -> None:
-        conn.execute(
+    def update(self, file_id: int, path: Path, inode: int, device: int) -> None:
+        self._conn.execute(
             "UPDATE file SET path = ?, inode = ?, device = ? WHERE id = ?",
             (str(path.resolve()), inode, device, file_id),
         )
-
-
-file = FileCRUD(table="file", unique_col="path", model=File)
