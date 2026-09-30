@@ -10,23 +10,29 @@ from collections.abc import Collection
 
 from tagumori.vault import Vault
 
-_cache: dict[str, set[int]] = {}
+_resolve_cache: dict[str, frozenset[int]] = {}
+_files_cache: dict[frozenset[int], list[str]] = []
 _cache_version: int | None = None
 
 
-def resolve_path(vault: Vault, path: str) -> set[int]:
+def _cache_check(vault: Vault) -> None:
+    global _cache_version
+    (version,) = vault.conn.execute("PRAGMA data_version").fetchone()
+    if version != _cache_version:
+        _resolve_cache.clear()
+        _files_cache.clear()
+        _cache_version = version
+
+
+def resolve_path(vault: Vault, path: str) -> frozenset[int]:
     """The file_tag.id's matching path's full chain of segments exactly.
 
     Empty if any segment fails to match.
     """
-    global _cache_version
-    (version,) = vault.conn.execute("PRAGMA data_version").fetchone()
-    if version != _cache_version:
-        _cache.clear()
-        _cache_version = version
+    _cache_check(vault)
 
-    if path in _cache:
-        return _cache[path]
+    if path in _resolve_cache:
+        return _resolve_cache[path]
 
     parts = path.split("/")
 
@@ -63,7 +69,7 @@ def resolve_path(vault: Vault, path: str) -> set[int]:
 
         next_ids = {r["id"] for r in kids}
 
-    _cache[path] = next_ids
+    _resolve_cache[path] = frozenset(next_ids)
     return next_ids
 
 
@@ -88,8 +94,15 @@ def child_tags(vault: Vault, ids: Collection[int]) -> list[str]:
 
 def files_at(vault: Vault, ids: Collection[int]) -> list[str]:
     """Absolute paths of files tagged with given ids"""
+
+    _cache_check(vault)
+
     if not ids:
         return []
+
+    key = frozenset(ids)
+    if key in _files_cache:
+        return _files_cache[key]
 
     phs = ",".join("?" for _ in ids)
     result = vault.conn.execute(
@@ -99,5 +112,7 @@ def files_at(vault: Vault, ids: Collection[int]) -> list[str]:
         """,
         tuple(ids),
     ).fetchall()
+
+    _files_cache[key] = result
 
     return [r["path"] for r in result]
