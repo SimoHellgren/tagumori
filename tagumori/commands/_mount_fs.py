@@ -14,20 +14,6 @@ def vault():
     return Vault(get_connection("vault.db"))
 
 
-def get_tags():
-
-    tags = vault().tags.get_all()
-
-    return sorted(t.name for t in tags)
-
-
-def get_files():
-
-    tags = vault().files.get_all()
-
-    return sorted(t.path for t in tags)
-
-
 def resolve(conn, path):
     parts = path.split("/")
 
@@ -138,6 +124,9 @@ def _link_attrs(now, target):
 
 
 class TagumoriFS(Operations):
+    def __init__(self, vault: Vault):
+        self.vault = vault
+
     def getattr(self, path, fh=None):
         now = time.time()
 
@@ -149,7 +138,8 @@ class TagumoriFS(Operations):
 
         if parent == "":
             # depth 1: only tag directories exist directly under root
-            if last in get_tags():
+            tags = [t.name for t in self.vault.tags.get_all()]
+            if last in tags:
                 return _dir_attrs(now)
             raise FuseOSError(errno.ENOENT)
 
@@ -164,7 +154,8 @@ class TagumoriFS(Operations):
 
     def readdir(self, path, fh):
         if path == "/":
-            return [".", "..", *get_tags()]
+            tags = [t.name for t in self.vault.tags.get_all()]
+            return [".", "..", *tags]
 
         else:
             kids = children(path)
