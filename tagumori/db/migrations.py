@@ -4,6 +4,9 @@ MIGRATIONS = {
     3: [
         "ALTER TABLE query ADD COLUMN ignore_tag_case BOOLEAN DEFAULT FALSE",
     ],
+    4: [
+        "CREATE INDEX IF NOT EXISTS idx_file_tag_parent_id ON file_tag(parent_id)",
+    ],
 }
 
 LATEST_VERSION = max(MIGRATIONS.keys())
