@@ -20,4 +20,7 @@ def mount(lazy_vault: LazyVault, path: Path):
             foreground=True,
             nothreads=True,
             allow_other=True,
+            entry_timeout="5",
+            attr_timeout="5",
+            negative_timeout="5",
         )
