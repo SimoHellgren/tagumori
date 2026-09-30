@@ -106,7 +106,7 @@ def files_at(vault: Vault, ids: Collection[int]) -> list[str]:
         return _files_cache[key]
 
     phs = ",".join("?" for _ in ids)
-    result = vault.conn.execute(
+    rows = vault.conn.execute(
         f"""select distinct(file.path) path from file
            join file_tag on file.id = file_tag.file_id
            where file_tag.id in ({phs})
@@ -114,6 +114,7 @@ def files_at(vault: Vault, ids: Collection[int]) -> list[str]:
         tuple(ids),
     ).fetchall()
 
+    result = [r["path"] for r in rows]
     _files_cache[key] = result
 
-    return [r["path"] for r in result]
+    return result
