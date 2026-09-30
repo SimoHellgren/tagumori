@@ -3,7 +3,7 @@ from sqlite3 import Connection
 
 import click
 
-from tagumori.db.connect import get_vault
+from tagumori.db.connect import get_connection
 from tagumori.vault import Vault
 
 
@@ -26,7 +26,7 @@ class LazyVault:
                     f"{self._path} does not exist. Run `ftag db init {self._path}` to create"
                 )
 
-            self._conn = self._ctx.with_resource(get_vault(self._path))
+            self._conn = self._ctx.with_resource(get_connection(self._path))
 
         return self._conn
 
