@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fuse import FUSE, FuseOSError, Operations
 
-from tagumori.reads import child_tags, files_at
+from tagumori.reads import child_tags, files_at, resolve_path
 from tagumori.vault import Vault
 
 
@@ -35,7 +35,7 @@ class TagumoriFS(Operations):
     def __init__(self, vault: Vault):
         self.vault = vault
 
-    def getattr(self, path, fh=None):
+    def getattr(self, path: str, fh: int) -> dict:
         now = time.time()
 
         if path == "/":
@@ -51,32 +51,36 @@ class TagumoriFS(Operations):
                 return _dir_attrs(now)
             raise FuseOSError(errno.ENOENT)
 
-        if last in child_tags(self.vault, parent):
+        lookup_ids = resolve_path(self.vault, parent)
+
+        if last in child_tags(self.vault, lookup_ids):
             return _dir_attrs(now)
 
         target = next(
-            (p for p in files_at(self.vault, parent) if Path(p).name == last), None
+            (p for p in files_at(self.vault, lookup_ids) if Path(p).name == last), None
         )
         if target is not None:
             return _link_attrs(now, target)
 
         raise FuseOSError(errno.ENOENT)
 
-    def readdir(self, path, fh):
+    def readdir(self, path: str, fh: int) -> list[str | tuple]:
         if path == "/":
             tags = [t.name for t in self.vault.tags.get_all()]
             return [".", "..", *tags]
 
         else:
-            kids = child_tags(self.vault, path)
-            paths = [Path(p).name for p in files_at(self.vault, path)]
+            lookup_ids = resolve_path(self.vault, path)
+            kids = child_tags(self.vault, lookup_ids)
+            paths = [Path(p).name for p in files_at(self.vault, lookup_ids)]
             return [".", "..", *kids, *paths]
 
-    def readlink(self, path):
+    def readlink(self, path: str) -> str:
         *init, last = path.split("/")
         parent = "/".join(init)
 
-        candidates = files_at(self.vault, parent)
+        lookup_ids = resolve_path(self.vault, parent)
+        candidates = files_at(self.vault, lookup_ids)
         target = next((p for p in candidates if Path(p).name == last), None)
         if target is None:
             raise FuseOSError(errno.ENOENT)
