@@ -10,7 +10,8 @@ from collections.abc import Collection
 
 from tagumori.vault import Vault
 
-_last: tuple[str, set[int]] | None = None
+_cache: dict[str, set[int]] = {}
+_cache_version: int | None = None
 
 
 def resolve_path(vault: Vault, path: str) -> set[int]:
@@ -18,9 +19,14 @@ def resolve_path(vault: Vault, path: str) -> set[int]:
 
     Empty if any segment fails to match.
     """
-    global _last
-    if _last is not None and _last[0] == path:
-        return _last[1]
+    global _cache_version
+    (version,) = vault.conn.execute("PRAGMA data_version").fetchone()
+    if version != _cache_version:
+        _cache.clear()
+        _cache_version = version
+
+    if path in _cache:
+        return _cache[path]
 
     parts = path.split("/")
 
@@ -57,7 +63,7 @@ def resolve_path(vault: Vault, path: str) -> set[int]:
 
         next_ids = {r["id"] for r in kids}
 
-    _last = path, next_ids
+    _cache[path] = next_ids
     return next_ids
 
 
