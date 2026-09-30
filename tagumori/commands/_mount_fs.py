@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fuse import FUSE, FuseOSError, Operations
 
-from tagumori.reads import children, files
+from tagumori.reads import child_tags, files_at
 from tagumori.vault import Vault
 
 
@@ -51,11 +51,11 @@ class TagumoriFS(Operations):
                 return _dir_attrs(now)
             raise FuseOSError(errno.ENOENT)
 
-        if last in children(self.vault, parent):
+        if last in child_tags(self.vault, parent):
             return _dir_attrs(now)
 
         target = next(
-            (p for p in files(self.vault, parent) if Path(p).name == last), None
+            (p for p in files_at(self.vault, parent) if Path(p).name == last), None
         )
         if target is not None:
             return _link_attrs(now, target)
@@ -68,15 +68,15 @@ class TagumoriFS(Operations):
             return [".", "..", *tags]
 
         else:
-            kids = children(self.vault, path)
-            paths = [Path(p).name for p in files(self.vault, path)]
+            kids = child_tags(self.vault, path)
+            paths = [Path(p).name for p in files_at(self.vault, path)]
             return [".", "..", *kids, *paths]
 
     def readlink(self, path):
         *init, last = path.split("/")
         parent = "/".join(init)
 
-        candidates = files(self.vault, parent)
+        candidates = files_at(self.vault, parent)
         target = next((p for p in candidates if Path(p).name == last), None)
         if target is None:
             raise FuseOSError(errno.ENOENT)

@@ -1,7 +1,19 @@
+"""Cross-table reads over the tag hierarchy. Primarily for the FUSE mount.
+
+A path here (e.g. "/genre/rock") is a sequence of tag names, matched
+depth-by-depth against file_tag.parent_id edges. Root position isn't
+enforced - a tag resolves wherever it occurs in the tree, regardless of
+whether it's actually a root tag for any given file.
+"""
+
 from tagumori.vault import Vault
 
 
-def resolve(vault: Vault, path: str):
+def resolve_path(vault: Vault, path: str) -> set[int]:
+    """The file_tag.id's matching path's full chain of segments exactly.
+
+    Empty if any segment fails to match.
+    """
     parts = path.split("/")
 
     _, first, *rest = parts
@@ -51,8 +63,9 @@ def resolve(vault: Vault, path: str):
     return next_ids
 
 
-def children(vault: Vault, path: str):
-    next_ids = resolve(vault, path)
+def child_tags(vault: Vault, path: str) -> list[str]:
+    """Distinct tag names one level below wherever `path` resolves to."""
+    next_ids = resolve_path(vault, path)
     if not next_ids:
         return []
 
@@ -70,8 +83,10 @@ def children(vault: Vault, path: str):
     return [r["name"] for r in result]
 
 
-def files(vault: Vault, path: str):
-    next_ids = resolve(vault, path)
+def files_at(vault: Vault, path: str) -> list[str]:
+    """Absolute paths of files tagged exactly at wherever `path` resolves to."""
+
+    next_ids = resolve_path(vault, path)
     if not next_ids:
         return []
 
