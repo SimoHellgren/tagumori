@@ -4,7 +4,7 @@ from pathlib import Path
 import click
 
 from tagumori import service
-from tagumori.commands import db, file, query, review, tag, tagalong
+from tagumori.commands import db, file, mount, query, review, tag, tagalong
 from tagumori.commands.common import (
     TAGTREE,
     file_print_options,
@@ -37,6 +37,7 @@ cli.add_command(db.db)
 cli.add_command(file.file)
 cli.add_command(query.query)
 cli.add_command(review.review)
+cli.add_command(mount.mount)
 
 
 @cli.command(help="Add tags to files")
