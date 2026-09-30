@@ -1,11 +1,12 @@
 [project]
 name = "tagumori"
-version = "1.2.9"
+version = "1.3.0"
 description = "Arbitrarily nestable tags for files"
 authors = [{name = "Simo Hellgrén"}]
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "click>=8.1.7",
+    "fusepy>=3.0.1",
     "prompt-toolkit>=3.0.53",
 ]
 
