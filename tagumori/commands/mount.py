@@ -14,4 +14,10 @@ def mount(lazy_vault: LazyVault, path: Path):
     from tagumori.commands._mount_fs import TagumoriFS
 
     with lazy_vault as vault:
-        FUSE(TagumoriFS(vault), str(path), foreground=True, nothreads=True)
+        FUSE(
+            TagumoriFS(vault),
+            str(path),
+            foreground=True,
+            nothreads=True,
+            allow_other=True,
+        )
