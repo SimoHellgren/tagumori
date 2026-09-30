@@ -10,12 +10,18 @@ from collections.abc import Collection
 
 from tagumori.vault import Vault
 
+_last: tuple[str, set[int]] | None = None
+
 
 def resolve_path(vault: Vault, path: str) -> set[int]:
     """The file_tag.id's matching path's full chain of segments exactly.
 
     Empty if any segment fails to match.
     """
+    global _last
+    if _last is not None and _last[0] == path:
+        return _last[1]
+
     parts = path.split("/")
 
     _, first, *rest = parts
@@ -51,6 +57,7 @@ def resolve_path(vault: Vault, path: str) -> set[int]:
 
         next_ids = {r["id"] for r in kids}
 
+    _last = path, next_ids
     return next_ids
 
 
