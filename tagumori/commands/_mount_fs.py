@@ -137,7 +137,7 @@ def _link_attrs(now, target):
     }
 
 
-class HelloFS(Operations):
+class TagumoriFS(Operations):
     def getattr(self, path, fh=None):
         now = time.time()
 
@@ -185,4 +185,4 @@ class HelloFS(Operations):
 
 if __name__ == "__main__":
     mountpoint = sys.argv[1]
-    FUSE(HelloFS(), mountpoint, foreground=True)
+    FUSE(TagumoriFS(), mountpoint, foreground=True)
