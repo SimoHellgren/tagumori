@@ -7,11 +7,12 @@ whether it's actually a root tag for any given file.
 """
 
 from collections.abc import Collection
+from pathlib import Path
 
 from tagumori.vault import Vault
 
 _resolve_cache: dict[str, frozenset[int]] = {}
-_files_cache: dict[frozenset[int], list[str]] = {}
+_files_cache: dict[frozenset[int], dict[str, str]] = {}  # name -> path
 _cache_version: int | None = None
 
 
@@ -93,9 +94,7 @@ def child_tags(vault: Vault, ids: Collection[int]) -> list[str]:
     return [r["name"] for r in result]
 
 
-def files_at(vault: Vault, ids: Collection[int]) -> list[str]:
-    """Absolute paths of files tagged with given ids"""
-
+def _files_by_name(vault: Vault, ids: Collection[int]) -> dict[str, str]:
     _cache_check(vault)
 
     if not ids:
@@ -114,7 +113,17 @@ def files_at(vault: Vault, ids: Collection[int]) -> list[str]:
         tuple(ids),
     ).fetchall()
 
-    result = [r["path"] for r in rows]
+    result = {Path(r["path"]).name: r["path"] for r in rows}
     _files_cache[key] = result
 
     return result
+
+
+def files_at(vault: Vault, ids: Collection[int]) -> list[str]:
+    """Absolute paths of files tagged with given ids"""
+    return list(_files_by_name(vault, ids).values())
+
+
+def file_at(vault: Vault, ids: Collection[int], name: str) -> str | None:
+    """Absolute path of the file named `name` among those tagged with ids."""
+    return _files_by_name(vault, ids).get(name)

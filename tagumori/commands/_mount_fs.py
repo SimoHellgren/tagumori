@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fuse import FUSE, FuseOSError, Operations
 
-from tagumori.reads import child_tags, files_at, resolve_path
+from tagumori.reads import _files_by_name, child_tags, file_at, resolve_path
 from tagumori.vault import Vault
 
 
@@ -56,9 +56,7 @@ class TagumoriFS(Operations):
         if last in child_tags(self.vault, lookup_ids):
             return _dir_attrs(now)
 
-        target = next(
-            (p for p in files_at(self.vault, lookup_ids) if Path(p).name == last), None
-        )
+        target = file_at(self.vault, lookup_ids, last)
         if target is not None:
             return _link_attrs(now, target)
 
@@ -73,7 +71,7 @@ class TagumoriFS(Operations):
         else:
             lookup_ids = resolve_path(self.vault, path)
             kids = child_tags(self.vault, lookup_ids)
-            targets = files_at(self.vault, lookup_ids)
+            targets = _files_by_name(self.vault, lookup_ids)
 
             entries = [(name, _dir_attrs(now), 0) for name in kids]
 
@@ -88,8 +86,8 @@ class TagumoriFS(Operations):
         parent = "/".join(init)
 
         lookup_ids = resolve_path(self.vault, parent)
-        candidates = files_at(self.vault, lookup_ids)
-        target = next((p for p in candidates if Path(p).name == last), None)
+
+        target = file_at(self.vault, lookup_ids, last)
         if target is None:
             raise FuseOSError(errno.ENOENT)
 
