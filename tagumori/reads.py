@@ -13,16 +13,30 @@ from tagumori.vault import Vault
 
 _resolve_cache: dict[str, frozenset[int]] = {}
 _files_cache: dict[frozenset[int], dict[str, str]] = {}  # name -> path
+_tag_cache: set[str] = set()
 _cache_version: int | None = None
 
 
-def _cache_check(vault: Vault) -> None:
+def _cache_check(vault: Vault) -> bool:
     global _cache_version
     (version,) = vault.conn.execute("PRAGMA data_version").fetchone()
     if version != _cache_version:
         _resolve_cache.clear()
         _files_cache.clear()
+        _tag_cache.clear()
         _cache_version = version
+
+        return False
+
+    return True
+
+
+def tag_names(vault: Vault) -> set[str]:
+    global _tag_cache
+    if not _cache_check(vault):
+        _tag_cache = {t.name for t in vault.tags.get_all()}
+
+    return _tag_cache
 
 
 def resolve_path(vault: Vault, path: str) -> frozenset[int]:
@@ -98,7 +112,7 @@ def _files_by_name(vault: Vault, ids: Collection[int]) -> dict[str, str]:
     _cache_check(vault)
 
     if not ids:
-        return []
+        return {}
 
     key = frozenset(ids)
     if key in _files_cache:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fuse import FUSE, FuseOSError, Operations
 
-from tagumori.reads import _files_by_name, child_tags, file_at, resolve_path
+from tagumori.reads import _files_by_name, child_tags, file_at, resolve_path, tag_names
 from tagumori.vault import Vault
 
 
@@ -46,7 +46,7 @@ class TagumoriFS(Operations):
 
         if parent == "":
             # depth 1: only tag directories exist directly under root
-            tags = [t.name for t in self.vault.tags.get_all()]
+            tags = tag_names(self.vault)
             if last in tags:
                 return _dir_attrs(now)
             raise FuseOSError(errno.ENOENT)
@@ -65,7 +65,7 @@ class TagumoriFS(Operations):
     def readdir(self, path: str, fh: int) -> list[str | tuple]:
         now = time.time()
         if path == "/":
-            tags = [t.name for t in self.vault.tags.get_all()]
+            tags = tag_names(self.vault)
             entries = [(name, _dir_attrs(now), 0) for name in tags]
 
         else:
@@ -76,7 +76,8 @@ class TagumoriFS(Operations):
             entries = [(name, _dir_attrs(now), 0) for name in kids]
 
             entries += [
-                (Path(target).name, _link_attrs(now, target), 0) for target in targets
+                (Path(target).name, _link_attrs(now, target), 0)
+                for target in targets.values()
             ]
 
         return [".", "..", *entries]
