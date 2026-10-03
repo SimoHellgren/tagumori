@@ -6,48 +6,22 @@ enforced - a tag resolves wherever it occurs in the tree, regardless of
 whether it's actually a root tag for any given file.
 """
 
-from collections.abc import Collection
 from pathlib import Path
 
-from tagumori.vault import Vault
-
-_resolve_cache: dict[str, frozenset[int]] = {}
-_files_cache: dict[frozenset[int], dict[str, str]] = {}  # name -> path
-_tag_cache: set[str] = set()
-_cache_version: int | None = None
+from tagumori.vault import Vault, datacache
 
 
-def _cache_check(vault: Vault) -> bool:
-    global _cache_version
-    (version,) = vault.conn.execute("PRAGMA data_version").fetchone()
-    if version != _cache_version:
-        _resolve_cache.clear()
-        _files_cache.clear()
-        _tag_cache.clear()
-        _cache_version = version
-
-        return False
-
-    return True
-
-
+@datacache
 def tag_names(vault: Vault) -> set[str]:
-    global _tag_cache
-    if not _cache_check(vault):
-        _tag_cache = {t.name for t in vault.tags.get_all()}
-
-    return _tag_cache
+    return {t.name for t in vault.tags.get_all()}
 
 
+@datacache
 def resolve_path(vault: Vault, path: str) -> frozenset[int]:
     """The file_tag.id's matching path's full chain of segments exactly.
 
     Empty if any segment fails to match.
     """
-    _cache_check(vault)
-
-    if path in _resolve_cache:
-        return _resolve_cache[path]
 
     parts = path.split("/")
 
@@ -85,11 +59,11 @@ def resolve_path(vault: Vault, path: str) -> frozenset[int]:
         next_ids = {r["id"] for r in kids}
 
     result = frozenset(next_ids)
-    _resolve_cache[path] = result
     return result
 
 
-def child_tags(vault: Vault, ids: Collection[int]) -> list[str]:
+@datacache
+def child_tags(vault: Vault, ids: frozenset[int]) -> list[str]:
     """Distinct tag names one level below given ids."""
     if not ids:
         return []
@@ -108,15 +82,11 @@ def child_tags(vault: Vault, ids: Collection[int]) -> list[str]:
     return [r["name"] for r in result]
 
 
-def _files_by_name(vault: Vault, ids: Collection[int]) -> dict[str, str]:
-    _cache_check(vault)
+@datacache
+def _files_by_name(vault: Vault, ids: frozenset[int]) -> dict[str, str]:
 
     if not ids:
         return {}
-
-    key = frozenset(ids)
-    if key in _files_cache:
-        return _files_cache[key]
 
     phs = ",".join("?" for _ in ids)
     rows = vault.conn.execute(
@@ -128,16 +98,15 @@ def _files_by_name(vault: Vault, ids: Collection[int]) -> dict[str, str]:
     ).fetchall()
 
     result = {Path(r["path"]).name: r["path"] for r in rows}
-    _files_cache[key] = result
 
     return result
 
 
-def files_at(vault: Vault, ids: Collection[int]) -> list[str]:
+def files_at(vault: Vault, ids: frozenset[int]) -> list[str]:
     """Absolute paths of files tagged with given ids"""
     return list(_files_by_name(vault, ids).values())
 
 
-def file_at(vault: Vault, ids: Collection[int], name: str) -> str | None:
+def file_at(vault: Vault, ids: frozenset[int], name: str) -> str | None:
     """Absolute path of the file named `name` among those tagged with ids."""
     return _files_by_name(vault, ids).get(name)

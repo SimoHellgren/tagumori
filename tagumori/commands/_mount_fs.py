@@ -44,6 +44,8 @@ class TagumoriFS(Operations):
         *init, last = path.split("/")
         parent = "/".join(init)
 
+        self.vault.check_cache()
+
         if parent == "":
             # depth 1: only tag directories exist directly under root
             tags = tag_names(self.vault)
@@ -64,6 +66,7 @@ class TagumoriFS(Operations):
 
     def readdir(self, path: str, fh: int) -> list[str | tuple]:
         now = time.time()
+        self.vault.check_cache()
         if path == "/":
             tags = tag_names(self.vault)
             entries = [(name, _dir_attrs(now), 0) for name in tags]
@@ -83,6 +86,7 @@ class TagumoriFS(Operations):
         return [".", "..", *entries]
 
     def readlink(self, path: str) -> str:
+        self.vault.check_cache()
         *init, last = path.split("/")
         parent = "/".join(init)
 
