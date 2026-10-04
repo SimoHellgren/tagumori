@@ -8,6 +8,7 @@ whether it's actually a root tag for any given file.
 
 from pathlib import Path
 
+from tagumori import service
 from tagumori.utils import flatten
 from tagumori.vault import Vault, datacache
 
@@ -112,3 +113,41 @@ def files_at(vault: Vault, ids: frozenset[int]) -> list[str]:
 def file_at(vault: Vault, ids: frozenset[int], name: str) -> str | None:
     """Absolute path of the file named `name` among those tagged with ids."""
     return _files_by_name(vault, ids).get(name)
+
+
+@datacache
+def query_names(vault: Vault) -> set[str]:
+    return {q.name for q in vault.queries.get_all()}
+
+
+@datacache
+def _files_by_query(vault: Vault, name: str) -> dict[str, str]:
+    """name -> path for every file a saved query resolves to.
+
+    Empty if no query with this name exists.
+    """
+    query = vault.queries.get_by_name(name)
+    if query is None:
+        return {}
+
+    files = service.execute_query(
+        vault,
+        query.select_tags,
+        query.exclude_tags,
+        query.ignore_tag_case,
+        query.pattern,
+        query.ignore_case,
+        query.invert_match,
+    )
+
+    return {f.path.name: str(f.path) for f in files}
+
+
+def files_for_query(vault: Vault, name: str) -> list[str]:
+    """Absolute paths of files matched by the saved query `name`."""
+    return list(_files_by_query(vault, name).values())
+
+
+def file_for_query(vault: Vault, name: str, filename: str) -> str | None:
+    """Absolute path of the file named `filename` within query `name`'s results."""
+    return _files_by_query(vault, name).get(filename)
