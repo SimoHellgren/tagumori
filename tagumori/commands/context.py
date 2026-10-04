@@ -33,7 +33,7 @@ class LazyVault:
     def __enter__(self) -> Vault:
         conn = self._get_conn()
         conn.__enter__()
-        return Vault(self._path, conn)
+        return Vault(conn)
 
     def __exit__(self, *args):
         # self._conn is basically guaranteed to exist, but this makes mypy happy
