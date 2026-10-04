@@ -8,6 +8,7 @@ whether it's actually a root tag for any given file.
 
 from pathlib import Path
 
+from tagumori.utils import flatten
 from tagumori.vault import Vault, datacache
 
 
@@ -22,44 +23,45 @@ def resolve_path(vault: Vault, path: str) -> frozenset[int]:
 
     Empty if any segment fails to match.
     """
+    _, *parts = path.split("/")
 
-    parts = path.split("/")
+    tuples = [(i, p) for i, p in enumerate(parts)]
+    values_phs = ",".join("(?, ?)" for _ in tuples)
 
-    _, first, *rest = parts
+    values = tuple(flatten(tuples))
 
-    start = vault.conn.execute(
-        """
-        select file_tag.id from file_tag
-        join tag on tag.id = file_tag.tag_id
-        where tag.name = ?
-        """,
-        (first,),
+    result = vault.conn.execute(
+        f"""
+        WITH path(depth, tag_name) as (VALUES {values_phs}),
+
+        cte as (
+            SELECT
+                file_tag.id id,
+                0 depth
+            FROM file_tag
+            JOIN tag on tag.id = file_tag.tag_id
+            JOIN path on path.depth = 0
+            WHERE tag.name = path.tag_name
+
+            UNION ALL
+
+            SELECT
+                child.id id,
+                parent.depth + 1 depth
+            FROM cte parent
+            JOIN file_tag child on child.parent_id = parent.id
+            JOIN tag ON tag.id = child.tag_id
+            JOIN path on path.depth = parent.depth + 1
+            WHERE tag.name = path.tag_name
+        )
+
+        SELECT distinct(id) from cte
+        where depth = {len(parts) - 1}
+    """,
+        values,
     ).fetchall()
 
-    next_ids = {r["id"] for r in start}
-
-    for part in rest:
-        phs = ",".join("?" for _ in next_ids)
-        # find child tags
-        kids = vault.conn.execute(
-            f"""select
-                file_tag.id,
-                tag.name
-            from file_tag
-            join tag on tag.id = file_tag.tag_id
-            where tag.name = ?
-            and file_tag.parent_id in ({phs})
-            """,
-            (part, *next_ids),
-        ).fetchall()
-
-        if not kids:
-            return frozenset()
-
-        next_ids = {r["id"] for r in kids}
-
-    result = frozenset(next_ids)
-    return result
+    return frozenset(r["id"] for r in result)
 
 
 @datacache
