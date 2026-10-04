@@ -102,6 +102,7 @@ class TagumoriFS(Operations):
 if __name__ == "__main__":
     from tagumori.db.connect import get_connection
 
-    vault = Vault(get_connection(Path("vault.db")))
+    path = Path("vault.db")
+    vault = Vault(path, get_connection(path))
     mountpoint = sys.argv[1]
     FUSE(TagumoriFS(vault), mountpoint, foreground=True)
