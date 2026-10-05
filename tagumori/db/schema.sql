@@ -35,8 +35,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS file_tag_unique_child
 ON file_tag (file_id, tag_id, parent_id)
 WHERE parent_id IS NOT NULL;
 
-/** TODO:
-    consider index on parent_id and potentially tag_id, parent_id
+/**
+    Index on parent_id added in migration (schema v4).
+    Consider adding index on tag_id, parent_id if needed.
 */
 -- Indices for lookup
 CREATE INDEX IF NOT EXISTS idx_file_tag_file_id ON file_tag(file_id);
