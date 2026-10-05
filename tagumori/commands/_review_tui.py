@@ -8,7 +8,6 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.input.defaults import create_input
 
 from tagumori.commands.review import ReviewSession
-from tagumori.query.parser import UnexpectedCharacters, UnexpectedToken
 
 DELIMS = "[,"
 
@@ -121,8 +120,8 @@ class REPL(cmd.Cmd):
             operation(tag_expr)
             click.echo(f"{verb}: {tag_expr}")
 
-        except (ValueError, UnexpectedToken, UnexpectedCharacters) as e:
-            click.echo(e)
+        except ValueError:
+            click.echo(f"Invalid expression: {tag_expr!r}")
 
     def do_add(self, arg):
         self._handle_tag_operation("Add tags: ", "Added", self.session.add_tags)

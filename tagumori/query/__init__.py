@@ -3,14 +3,17 @@ from sqlite3 import Connection
 
 from tagumori.query.ast import Expr, Transformer, validate_for_storage
 from tagumori.query.executor import execute
-from tagumori.query.parser import Lark_StandAlone
+from tagumori.query.parser import Lark_StandAlone, UnexpectedCharacters, UnexpectedToken
 from tagumori.query.planner import simplify, to_query_plan
 
 
 def parse(string: str) -> Expr:
     parser = Lark_StandAlone(transformer=Transformer())
-    ast = parser.parse(string)
-    return ast
+    try:
+        ast = parser.parse(string)
+        return ast
+    except (UnexpectedToken, UnexpectedCharacters) as e:
+        raise ValueError(e)
 
 
 def search(

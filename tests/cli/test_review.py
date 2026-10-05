@@ -8,7 +8,6 @@ from tagumori.commands import review as review_module
 from tagumori.commands._review_tui import REPL, TagCompleter
 from tagumori.commands.context import LazyVault
 from tagumori.commands.review import ReviewSession
-from tagumori.query.parser import UnexpectedToken
 
 
 @pytest.fixture
@@ -186,7 +185,7 @@ class TestAddTags:
         assert "rock" in second.known_tags
 
     def test_malformed_expression_raises(self, session):
-        with pytest.raises(UnexpectedToken):
+        with pytest.raises(ValueError):
             session.add_tags("rock[")
 
     def test_non_storage_expression_is_rejected(self, session):
@@ -221,7 +220,7 @@ class TestSetTags:
         assert "jazz" in session.known_tags
 
     def test_malformed_expression_raises(self, session):
-        with pytest.raises(UnexpectedToken):
+        with pytest.raises(ValueError):
             session.set_tags("rock[")
 
     def test_failed_set_does_not_extend_known_tags(self, session):
@@ -244,7 +243,7 @@ class TestRemoveTags:
         assert str(tagged[0].tags) == ""
 
     def test_malformed_expression_raises(self, session):
-        with pytest.raises(UnexpectedToken):
+        with pytest.raises(ValueError):
             session.remove_tags("rock[")
 
 
@@ -390,7 +389,7 @@ class TestREPL:
         repl.onecmd("add")
 
         assert session.known_tags == set()
-        assert "Unexpected token" in capsys.readouterr().out
+        assert "Invalid expression" in capsys.readouterr().out
 
     def test_set_replaces_tags_entered_at_the_prompt(
         self, session, lazy_vault, prompts, sample_files
@@ -413,7 +412,7 @@ class TestREPL:
 
         repl.onecmd("set")
 
-        assert "Unexpected token" in capsys.readouterr().out
+        assert "Invalid expression" in capsys.readouterr().out
 
     def test_remove_removes_tags_entered_at_the_prompt(
         self, session, lazy_vault, prompts, sample_files
@@ -439,7 +438,7 @@ class TestREPL:
 
         repl.onecmd("remove")
 
-        assert "Unexpected token" in capsys.readouterr().out
+        assert "Invalid expression" in capsys.readouterr().out
 
     def test_flag_adds_the_flag_tag(self, session, lazy_vault, prompts, sample_files):
         repl = REPL(session)
