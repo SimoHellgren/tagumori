@@ -31,6 +31,10 @@ check_untyped_defs = true
 module = "tagumori.query.parser"
 ignore_errors = true
 
+[[tool.mypy.overrides]]
+module = "fuse"
+ignore_missing_imports = true
+
 [tool.coverage.run]
 source = ["tagumori"]
 omit = ["tagumori/query/parser.py"]
