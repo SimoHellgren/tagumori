@@ -203,6 +203,51 @@ class TestAddTags:
             assert vault.files.get_by_path(sample_files[0]) is None
 
 
+class TestSetTags:
+    def test_replaces_existing_tags(self, session, lazy_vault, sample_files):
+        session.add_tags("rock")
+        session.set_tags("jazz")
+
+        with lazy_vault as vault:
+            file = vault.files.get_by_path(sample_files[0])
+            assert file is not None
+            tagged = service.lookup_tags(vault, [file])
+
+        assert str(tagged[0].tags) == "jazz"
+
+    def test_extends_known_tags(self, session):
+        session.set_tags("jazz")
+
+        assert "jazz" in session.known_tags
+
+    def test_malformed_expression_raises(self, session):
+        with pytest.raises(UnexpectedToken):
+            session.set_tags("rock[")
+
+    def test_failed_set_does_not_extend_known_tags(self, session):
+        with pytest.raises(ValueError):
+            session.set_tags("a|b")
+
+        assert session.known_tags == set()
+
+
+class TestRemoveTags:
+    def test_removes_a_tag(self, session, lazy_vault, sample_files):
+        session.add_tags("rock")
+        session.remove_tags("rock")
+
+        with lazy_vault as vault:
+            file = vault.files.get_by_path(sample_files[0])
+            assert file is not None
+            tagged = service.lookup_tags(vault, [file])
+
+        assert str(tagged[0].tags) == ""
+
+    def test_malformed_expression_raises(self, session):
+        with pytest.raises(UnexpectedToken):
+            session.remove_tags("rock[")
+
+
 class TestFileInfo:
     def test_untracked_file_reports_and_returns(self, session, capsys):
         session.file_info()
@@ -346,6 +391,82 @@ class TestREPL:
 
         assert session.known_tags == set()
         assert "Unexpected token" in capsys.readouterr().out
+
+    def test_set_replaces_tags_entered_at_the_prompt(
+        self, session, lazy_vault, prompts, sample_files
+    ):
+        repl = REPL(session)
+        prompts.script("jazz")
+
+        repl.onecmd("set")
+
+        with lazy_vault as vault:
+            file = vault.files.get_by_path(sample_files[0])
+            assert file is not None
+            tagged = service.lookup_tags(vault, [file])
+
+        assert str(tagged[0].tags) == "jazz"
+
+    def test_set_reports_a_parse_error_without_raising(self, session, prompts, capsys):
+        repl = REPL(session)
+        prompts.script("rock[")
+
+        repl.onecmd("set")
+
+        assert "Unexpected token" in capsys.readouterr().out
+
+    def test_remove_removes_tags_entered_at_the_prompt(
+        self, session, lazy_vault, prompts, sample_files
+    ):
+        session.add_tags("rock")
+        repl = REPL(session)
+        prompts.script("rock")
+
+        repl.onecmd("remove")
+
+        with lazy_vault as vault:
+            file = vault.files.get_by_path(sample_files[0])
+            assert file is not None
+            tagged = service.lookup_tags(vault, [file])
+
+        assert str(tagged[0].tags) == ""
+
+    def test_remove_reports_a_parse_error_without_raising(
+        self, session, prompts, capsys
+    ):
+        repl = REPL(session)
+        prompts.script("rock[")
+
+        repl.onecmd("remove")
+
+        assert "Unexpected token" in capsys.readouterr().out
+
+    def test_flag_adds_the_flag_tag(self, session, lazy_vault, prompts, sample_files):
+        repl = REPL(session)
+
+        repl.onecmd("flag")
+
+        with lazy_vault as vault:
+            file = vault.files.get_by_path(sample_files[0])
+            assert file is not None
+            tagged = service.lookup_tags(vault, [file])
+
+        assert "__flag" in str(tagged[0].tags)
+
+    def test_unflag_removes_the_flag_tag(
+        self, session, lazy_vault, prompts, sample_files
+    ):
+        session.add_tags("__flag")
+        repl = REPL(session)
+
+        repl.onecmd("unflag")
+
+        with lazy_vault as vault:
+            file = vault.files.get_by_path(sample_files[0])
+            assert file is not None
+            tagged = service.lookup_tags(vault, [file])
+
+        assert "__flag" not in str(tagged[0].tags)
 
     def test_run_exits_on_end_of_input(self, session, prompts):
         """An exhausted script raises EOFError, as Ctrl-D would."""

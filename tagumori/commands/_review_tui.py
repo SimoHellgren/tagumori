@@ -1,4 +1,5 @@
 import cmd
+from collections.abc import Callable
 
 import click
 from prompt_toolkit import PromptSession
@@ -106,22 +107,39 @@ class REPL(cmd.Cmd):
         click.echo()
         return True
 
-    def do_add(self, arg):
+    def _handle_tag_operation(
+        self, prompt: str, verb: str, operation: Callable[[str], None]
+    ):
         try:
-            tag_expr = self.tag_session.prompt(
-                "Add tags: ", completer=self.tag_completer
-            )
+            tag_expr = self.tag_session.prompt(prompt, completer=self.tag_completer)
 
         except (EOFError, KeyboardInterrupt):
             click.echo("Canceled.")
             return
 
         try:
-            self.session.add_tags(tag_expr)
-            click.echo(f"Added: {tag_expr}")
+            operation(tag_expr)
+            click.echo(f"{verb}: {tag_expr}")
 
         except (ValueError, UnexpectedToken, UnexpectedCharacters) as e:
             click.echo(e)
+
+    def do_add(self, arg):
+        self._handle_tag_operation("Add tags: ", "Added", self.session.add_tags)
+
+    def do_set(self, arg):
+        self._handle_tag_operation("Set tags: ", "Set", self.session.set_tags)
+
+    def do_remove(self, arg):
+        self._handle_tag_operation("Remove tags: ", "Removed", self.session.remove_tags)
+
+    def do_flag(self, arg):
+        self.session.add_tags("__flag")
+        click.echo(f"Flagged {self.session.current}")
+
+    def do_unflag(self, arg):
+        self.session.remove_tags("__flag")
+        click.echo(f"Unflagged {self.session.current}")
 
     def do_info(self, arg):
         self.session.file_info()

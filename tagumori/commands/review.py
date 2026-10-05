@@ -49,16 +49,26 @@ class ReviewSession:
 
         print_file_info(tagged_file[0])
 
-    def add_tags(self, expr: str) -> None:
-        # validate before hitting db
-        node = parse_for_storage(expr)
-
-        service.add_tags_to_files(self.vault, [self.current], node)
-
+    def _learn_tags(self, node):
         # TODO: should probably make _ast_to_leaf_paths a public method
         # TODO: paths is also a bit overkill - could just recurse to get unique tags
         new_tags = {*flatten(service._ast_to_leaf_paths(node))}
         self.known_tags |= new_tags
+
+    def add_tags(self, expr: str) -> None:
+        node = parse_for_storage(expr)
+        service.add_tags_to_files(self.vault, [self.current], node)
+        self._learn_tags(node)
+
+    def set_tags(self, expr: str) -> None:
+        node = parse_for_storage(expr)
+        service.set_tags_on_files(self.vault, [self.current], node)
+        self._learn_tags(node)
+
+    def remove_tags(self, expr: str) -> None:
+        node = parse_for_storage(expr)
+        service.remove_tags_from_files(self.vault, [self.current], node)
+        self._learn_tags(node)
 
 
 def _stdio_has_tty() -> bool:
