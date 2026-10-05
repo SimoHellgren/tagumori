@@ -78,8 +78,11 @@ def _stdio_has_tty() -> bool:
 
 @click.command()
 @click.argument("file", type=click.File("r"))
+@click.option(
+    "--autoinfo", is_flag=True, help="Automatically show info after each navigation"
+)
 @click.pass_obj
-def review(lazy_vault: LazyVault, file: TextIO):
+def review(lazy_vault: LazyVault, file: TextIO, autoinfo: bool):
     from tagumori.commands._review_tui import REPL
 
     lines = [Path(l.strip()) for l in file if l.strip()]
@@ -96,6 +99,6 @@ def review(lazy_vault: LazyVault, file: TextIO):
     with lazy_vault as vault:
         session = ReviewSession(vault, lines)
 
-    repl = REPL(session)
+    repl = REPL(session, autoinfo)
 
     repl.run()

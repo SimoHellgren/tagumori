@@ -40,8 +40,9 @@ class TagCompleter(Completer):
 class REPL(cmd.Cmd):
     prompt = "> "
 
-    def __init__(self, session: ReviewSession):
+    def __init__(self, session: ReviewSession, autoinfo: bool = False):
         self.session = session
+        self.autoinfo = autoinfo
 
         shared_input = create_input(always_prefer_tty=True)
 
@@ -65,6 +66,9 @@ class REPL(cmd.Cmd):
         return f"{(s.index + 1)}/{len(s.items)} {s.current.name} > "
 
     def run(self):
+        last = self.session.current
+        if self.autoinfo:
+            self.session.file_info()
         while True:
             try:
                 line = self.cmd_session.prompt(
@@ -74,6 +78,9 @@ class REPL(cmd.Cmd):
                 break
             if self.onecmd(line):
                 break
+            if self.autoinfo and self.session.current != last:
+                self.session.file_info()
+                last = self.session.current
 
     def do_goto(self, arg):
         """Go to position (indexed from 1)"""
