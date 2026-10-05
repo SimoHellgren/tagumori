@@ -40,9 +40,23 @@ def _link_attrs(now, target):
     }
 
 
+def _route(path: str) -> tuple[str, list[str]]:
+    """Splits a mount path into its top-level section ("tags"/"queries") and
+    the segments below it."""
+    root, *rest = path.split("/")[1:]
+    return root, rest
+
+
 class TagumoriFS(Operations):
     def __init__(self, vault: Vault):
         self.vault = vault
+
+    def _tag_lookup(self, rest: list[str]) -> tuple[frozenset[int], str]:
+        """Resolves all but the last segment to a tag-tree position, for
+        looking up what the last segment names there."""
+        *init, last = rest
+        parent = "/" + "/".join(init)
+        return resolve_path(self.vault, parent), last
 
     def getattr(self, path: str, fh: int) -> dict:
         now = time.time()
@@ -51,30 +65,28 @@ class TagumoriFS(Operations):
             return _dir_attrs(now)
 
         self.vault.check_cache()
+        root, rest = _route(path)
 
-        root, *rest = path.split("/")[1:]
-
-        if root == "tags":
-            return self._tags_getattr(rest, now)
-        if root == "queries":
-            return self._queries_getattr(rest, now)
-
-        raise FuseOSError(errno.ENOENT)
+        match root:
+            case "tags":
+                return self._tags_getattr(rest, now)
+            case "queries":
+                return self._queries_getattr(rest, now)
+            case _:
+                raise FuseOSError(errno.ENOENT)
 
     def _tags_getattr(self, rest: list[str], now: float) -> dict:
         if not rest:
             return _dir_attrs(now)
 
-        *init, last = rest
-
-        if not init:
+        if len(rest) == 1:
             # depth 1: only tag directories exist directly under /tags
+            (last,) = rest
             if last in tag_names(self.vault):
                 return _dir_attrs(now)
             raise FuseOSError(errno.ENOENT)
 
-        parent = "/" + "/".join(init)
-        lookup_ids = resolve_path(self.vault, parent)
+        lookup_ids, last = self._tag_lookup(rest)
 
         if last in child_tags(self.vault, lookup_ids):
             return _dir_attrs(now)
@@ -110,15 +122,15 @@ class TagumoriFS(Operations):
             return [".", "..", "tags", "queries"]
 
         self.vault.check_cache()
+        root, rest = _route(path)
 
-        root, *rest = path.split("/")[1:]
-
-        if root == "tags":
-            entries = self._tags_readdir(rest, now)
-        elif root == "queries":
-            entries = self._queries_readdir(rest, now)
-        else:
-            raise FuseOSError(errno.ENOENT)
+        match root:
+            case "tags":
+                entries = self._tags_readdir(rest, now)
+            case "queries":
+                entries = self._queries_readdir(rest, now)
+            case _:
+                raise FuseOSError(errno.ENOENT)
 
         return [".", "..", *entries]
 
@@ -152,18 +164,17 @@ class TagumoriFS(Operations):
 
     def readlink(self, path: str) -> str:
         self.vault.check_cache()
+        root, rest = _route(path)
 
-        root, *rest = path.split("/")[1:]
-
-        target = None
-        if root == "tags":
-            *init, last = rest
-            parent = "/" + "/".join(init)
-            lookup_ids = resolve_path(self.vault, parent)
-            target = file_at(self.vault, lookup_ids, last)
-        elif root == "queries":
-            name, filename = rest
-            target = file_for_query(self.vault, name, filename)
+        match root:
+            case "tags":
+                lookup_ids, last = self._tag_lookup(rest)
+                target = file_at(self.vault, lookup_ids, last)
+            case "queries":
+                name, filename = rest
+                target = file_for_query(self.vault, name, filename)
+            case _:
+                target = None
 
         if target is None:
             raise FuseOSError(errno.ENOENT)
