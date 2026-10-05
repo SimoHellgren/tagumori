@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from collections.abc import Callable, Generator
 from pathlib import Path
@@ -62,5 +63,29 @@ def make_tagged_file(vault: Vault) -> Callable[..., int]:
                 tag = vault.tags.get_or_create(tag_name)
                 parent_id = vault.file_tags.attach(file_row.id, tag.id, parent_id)
         return file_row.id
+
+    return _make
+
+
+@pytest.fixture
+def make_query(vault: Vault) -> Callable[..., None]:
+    """Saves a query directly, bypassing the CLI's DSL parsing - select/exclude
+    are plain tag names here, not full query-DSL expressions."""
+
+    def _make(
+        name: str,
+        select: str | None = None,
+        exclude: str | None = None,
+        pattern: str = ".*",
+    ) -> None:
+        vault.queries.create(
+            name=name,
+            select_tags=json.dumps([select] if select else []),
+            exclude_tags=json.dumps([exclude] if exclude else []),
+            ignore_tag_case=False,
+            pattern=pattern,
+            ignore_case=False,
+            invert_match=False,
+        )
 
     return _make
