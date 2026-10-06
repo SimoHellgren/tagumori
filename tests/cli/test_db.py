@@ -1,30 +1,299 @@
+import re
+import sqlite3
 from pathlib import Path
 
+import pytest
+from click.testing import CliRunner
+
 from tagumori.cli import cli
+from tagumori.db.init import init_db
+
+VAULT_ID = re.compile(r"tagumori-[0-9a-f]{6}")
+
+
+def pointer_of(directory: Path) -> Path:
+    return directory / ".tagumori" / "pointer"
+
+
+def vault_id_of(directory: Path) -> str:
+    return pointer_of(directory).read_text().strip()
+
+
+def db_dirs(data_home: Path) -> list[str]:
+    """Names of the vault directories in the data dir (it may not exist yet)."""
+    if not data_home.exists():
+        return []
+
+    return sorted(p.name for p in data_home.iterdir())
+
+
+@pytest.fixture
+def project(tmp_path: Path) -> Path:
+    """An empty directory to initialise a vault in."""
+    path = tmp_path / "project"
+    path.mkdir()
+    return path
+
+
+@pytest.fixture
+def initialized(runner: CliRunner, project: Path) -> Path:
+    """A directory where `tm db init` has already succeeded."""
+    result = runner.invoke(cli, ["db", "init", str(project)])
+    assert result.exit_code == 0, result.output
+    return project
 
 
 class TestInit:
-    def test_init_creates_vault(self, runner, tmp_path):
-        vault_path = tmp_path / "new_vault.db"
-
-        result = runner.invoke(cli, ["db", "init", str(vault_path)])
+    def test_writes_pointer_with_vault_id(self, runner, project):
+        result = runner.invoke(cli, ["db", "init", str(project)])
 
         assert result.exit_code == 0
-        assert vault_path.exists()
-        assert "created" in result.output
+        assert VAULT_ID.fullmatch(vault_id_of(project))
 
-    def test_init_existing_vault(self, runner, vault):
-        result = runner.invoke(cli, ["db", "init", str(vault)])
+    def test_creates_db_in_data_dir(self, runner, project, data_home):
+        runner.invoke(cli, ["db", "init", str(project)])
+
+        db_path = data_home / vault_id_of(project) / "vault.db"
+        assert db_path.is_file()
+        assert db_dirs(data_home) == [vault_id_of(project)]
+
+        with sqlite3.connect(db_path) as conn:
+            tables = {
+                name
+                for (name,) in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+        assert {"file", "tag", "file_tag"} <= tables
+
+    def test_creates_no_db_in_the_project(self, runner, project):
+        runner.invoke(cli, ["db", "init", str(project)])
+
+        assert sorted(p.name for p in project.iterdir()) == [".tagumori"]
+        assert [p.name for p in (project / ".tagumori").iterdir()] == ["pointer"]
+
+    @pytest.mark.parametrize("xdg", [None, ""], ids=["unset", "empty"])
+    def test_falls_back_to_home_without_xdg_data_home(
+        self, runner, project, tmp_path, monkeypatch, xdg
+    ):
+        home = tmp_path / "home"
+        home.mkdir()
+        monkeypatch.setenv("HOME", str(home))
+        if xdg is None:
+            monkeypatch.delenv("XDG_DATA_HOME")
+        else:
+            monkeypatch.setenv("XDG_DATA_HOME", xdg)
+
+        result = runner.invoke(cli, ["db", "init", str(project)])
 
         assert result.exit_code == 0
-        assert "already exists" in result.output
+        db_path = home / ".local/share/tagumori" / vault_id_of(project) / "vault.db"
+        assert db_path.is_file()
 
-    def test_init_default_path(self, runner, tmp_path):
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            result = runner.invoke(cli, ["db", "init"])
+    def test_defaults_to_current_directory(self, runner, project, monkeypatch):
+        monkeypatch.chdir(project)
 
-            assert result.exit_code == 0
-            assert Path("vault.db").exists()
+        result = runner.invoke(cli, ["db", "init"])
+
+        assert result.exit_code == 0
+        assert VAULT_ID.fullmatch(vault_id_of(project))
+
+    def test_creates_missing_directory(self, runner, tmp_path, data_home):
+        target = tmp_path / "does" / "not" / "exist"
+
+        result = runner.invoke(cli, ["db", "init", str(target)])
+
+        assert result.exit_code == 0
+        assert (data_home / vault_id_of(target) / "vault.db").is_file()
+
+    def test_each_vault_gets_its_own_id(self, runner, tmp_path, data_home):
+        first, second = tmp_path / "first", tmp_path / "second"
+        first.mkdir()
+        second.mkdir()
+
+        runner.invoke(cli, ["db", "init", str(first)])
+        runner.invoke(cli, ["db", "init", str(second)])
+
+        assert vault_id_of(first) != vault_id_of(second)
+        assert len(db_dirs(data_home)) == 2
+
+    def test_retries_on_id_collision(self, runner, tmp_path, data_home, monkeypatch):
+        ids = iter(["aaaaaa", "aaaaaa", "bbbbbb"])
+        monkeypatch.setattr("secrets.token_hex", lambda nbytes=None: next(ids))
+        first, second = tmp_path / "first", tmp_path / "second"
+        first.mkdir()
+        second.mkdir()
+
+        runner.invoke(cli, ["db", "init", str(first)])
+        result = runner.invoke(cli, ["db", "init", str(second)])
+
+        assert result.exit_code == 0
+        assert vault_id_of(first) == "tagumori-aaaaaa"
+        assert vault_id_of(second) == "tagumori-bbbbbb"
+        assert db_dirs(data_home) == ["tagumori-aaaaaa", "tagumori-bbbbbb"]
+
+
+class TestInitWhenAlreadyThere:
+    """`init` must never create a second db where a vault is already set up."""
+
+    def test_second_init_is_refused(self, runner, initialized, data_home):
+        before = vault_id_of(initialized)
+
+        result = runner.invoke(cli, ["db", "init", str(initialized)])
+
+        assert result.exit_code != 0
+        assert "already initialized" in result.output.lower()
+        assert vault_id_of(initialized) == before
+        assert db_dirs(data_home) == [before]
+
+    def test_pointer_whose_db_is_missing_is_refused(
+        self, runner, project, data_home
+    ):
+        pointer_of(project).parent.mkdir()
+        pointer_of(project).write_text("tagumori-abcdef")
+
+        result = runner.invoke(cli, ["db", "init", str(project)])
+
+        assert result.exit_code != 0
+        assert "tagumori-abcdef" in result.output
+        assert vault_id_of(project) == "tagumori-abcdef"
+        assert db_dirs(data_home) == []
+
+    def test_empty_pointer_is_treated_as_uninitialized(self, runner, project):
+        """What a crash between claiming the pointer and writing the id leaves."""
+        pointer_of(project).parent.mkdir()
+        pointer_of(project).touch()
+
+        result = runner.invoke(cli, ["db", "init", str(project)])
+
+        assert result.exit_code == 0
+        assert VAULT_ID.fullmatch(vault_id_of(project))
+
+    def test_pointer_with_path_traversal_is_rejected(
+        self, runner, project, data_home
+    ):
+        pointer_of(project).parent.mkdir()
+        pointer_of(project).write_text("../evil")
+
+        result = runner.invoke(cli, ["db", "init", str(project)])
+
+        assert result.exit_code != 0
+        assert "invalid" in result.output.lower()
+        assert db_dirs(data_home) == []
+
+
+class TestInitFailure:
+    def test_failure_leaves_nothing_behind(
+        self, runner, project, data_home, monkeypatch
+    ):
+        def explode(path: Path) -> None:
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr("tagumori.commands.db.init_db", explode)
+
+        result = runner.invoke(cli, ["db", "init", str(project)])
+
+        assert result.exit_code != 0
+        assert db_dirs(data_home) == []
+        assert not pointer_of(project).exists()
+
+    def test_can_init_again_after_a_failure(
+        self, runner, project, data_home, monkeypatch
+    ):
+        with monkeypatch.context() as m:
+            m.setattr(
+                "tagumori.commands.db.init_db",
+                lambda path: (_ for _ in ()).throw(RuntimeError("boom")),
+            )
+            runner.invoke(cli, ["db", "init", str(project)])
+
+        result = runner.invoke(cli, ["db", "init", str(project)])
+
+        assert result.exit_code == 0
+        assert db_dirs(data_home) == [vault_id_of(project)]
+
+
+class TestDiscovery:
+    def test_finds_pointer_in_current_directory(
+        self, runner, initialized, data_home, monkeypatch
+    ):
+        monkeypatch.chdir(initialized)
+
+        result = runner.invoke(cli, ["db", "info"])
+
+        assert result.exit_code == 0
+        expected = data_home / vault_id_of(initialized) / "vault.db"
+        assert str(expected) in result.output
+
+    def test_finds_pointer_in_a_parent_directory(
+        self, runner, initialized, data_home, monkeypatch
+    ):
+        nested = initialized / "a" / "b"
+        nested.mkdir(parents=True)
+        monkeypatch.chdir(nested)
+
+        result = runner.invoke(cli, ["db", "info"])
+
+        assert result.exit_code == 0
+        expected = data_home / vault_id_of(initialized) / "vault.db"
+        assert str(expected) in result.output
+
+    def test_no_vault_anywhere(self, runner, tmp_path, monkeypatch):
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.chdir(empty)
+
+        result = runner.invoke(cli, ["ls"])
+
+        assert result.exit_code != 0
+        assert "Vault not found" in result.output
+
+    def test_vault_option_overrides_discovery(
+        self, runner, initialized, vault, monkeypatch
+    ):
+        monkeypatch.chdir(initialized)
+
+        result = runner.invoke(cli, ["--vault", str(vault), "db", "info"])
+
+        assert result.exit_code == 0
+        assert str(vault) in result.output
+
+    def test_empty_pointer_is_not_a_vault(self, runner, project, monkeypatch):
+        pointer_of(project).parent.mkdir()
+        pointer_of(project).touch()
+        monkeypatch.chdir(project)
+
+        result = runner.invoke(cli, ["ls"])
+
+        assert result.exit_code != 0
+        assert "Vault not found" in result.output
+
+    def test_pointer_with_trailing_newline(
+        self, runner, initialized, data_home, monkeypatch
+    ):
+        pointer_of(initialized).write_text(vault_id_of(initialized) + "\n")
+        monkeypatch.chdir(initialized)
+
+        result = runner.invoke(cli, ["db", "info"])
+
+        assert result.exit_code == 0
+
+    def test_pointer_with_path_traversal_is_rejected(
+        self, runner, project, data_home, monkeypatch
+    ):
+        """A real db outside the data dir must not be reachable via `../`."""
+        # `data_home/../outside` only resolves if data_home itself exists
+        data_home.mkdir(parents=True)
+        outside = data_home.parent / "outside"
+        outside.mkdir()
+        init_db(outside / "vault.db")
+        pointer_of(project).parent.mkdir()
+        pointer_of(project).write_text("../outside")
+        monkeypatch.chdir(project)
+
+        result = runner.invoke(cli, ["db", "info"])
+
+        assert result.exit_code != 0
 
 
 class TestBackup:

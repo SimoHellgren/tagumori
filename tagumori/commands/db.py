@@ -65,14 +65,15 @@ def init(directory: Path):
     pointer = directory / ".tagumori/pointer"
     _ensure_uninitialized(pointer)
 
+    pointer.parent.mkdir(parents=True, exist_ok=True)
     db_dir = _new_db_dir()
 
     try:
         init_db(db_dir / "vault.db")
-        pointer.parent.mkdir(exist_ok=True)
         pointer.write_text(db_dir.name)
     except BaseException:  # in case literally anything crashes the process
         shutil.rmtree(db_dir, ignore_errors=True)
+        raise
 
 
 @db.command(help="Create a backup of vault.")

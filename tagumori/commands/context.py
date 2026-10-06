@@ -23,7 +23,7 @@ class LazyVault:
             raise click.ClickException(
                 "Vault not found. Run `tagumori db init` to create"
             )
-        return self._get_path()
+        return p
 
     def _get_conn(self) -> Connection:
         if self._conn is None:

@@ -12,8 +12,15 @@ from tagumori.vault import Vault
 
 
 @pytest.fixture(autouse=True)
-def setup_data_dir(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+def data_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Redirects XDG_DATA_HOME into tmp_path; returns tagumori's data dir in it.
+
+    Autouse so no test can write into the real data directory. The returned
+    directory is not created until something needs it.
+    """
+    xdg = tmp_path / "xdg"
+    monkeypatch.setenv("XDG_DATA_HOME", str(xdg))
+    return xdg / "tagumori"
 
 
 @pytest.fixture
