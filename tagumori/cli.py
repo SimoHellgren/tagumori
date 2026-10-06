@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import click
@@ -13,22 +13,31 @@ from tagumori.commands.common import (
     tag_tree_callback,
 )
 from tagumori.commands.context import LazyVault
+from tagumori.commands.db import data_dir
 from tagumori.query.ast import Expr
 from tagumori.render import format_file_output
 
-DEFAULT_VAULT_PATH = Path("./vault.db")
+
+def discover_vault() -> Path | None:
+    cwd = Path().cwd()
+    for p in [cwd, *cwd.parents]:
+        candidate = p / ".tagumori/pointer"
+        if candidate.exists():
+            return Path(data_dir() / candidate.read_text() / "vault.db")
+
+    return None
 
 
 @click.group()
 @click.option(
     "--vault",
     type=click.Path(path_type=Path),
-    default=DEFAULT_VAULT_PATH,
-    help=f"Path to vault file, default {DEFAULT_VAULT_PATH}",
+    help="Path to vault file",
 )
 @click.pass_context
 def cli(ctx: click.Context, vault: Path):
-    ctx.obj = LazyVault(vault, ctx)
+    get_path: Callable[[], Path | None] = lambda: vault or discover_vault()
+    ctx.obj = LazyVault(get_path, ctx)
 
 
 cli.add_command(tag.tag)

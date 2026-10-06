@@ -9,7 +9,7 @@ class TestVaultRequired:
             result = runner.invoke(cli, ["ls"])
 
             assert result.exit_code != 0
-            assert "does not exist" in result.output
+            assert "No vault found" in result.output
 
 
 class TestAdd:

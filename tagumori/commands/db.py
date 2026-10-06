@@ -1,3 +1,4 @@
+import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -14,15 +15,64 @@ def db(vault: LazyVault):
     pass
 
 
-@db.command(help="Initialize empty vault")
-@click.argument("filepath", type=click.Path(path_type=Path), default="vault.db")
-def init(filepath: Path):
-    if filepath.exists():
-        click.echo(f"{filepath} already exists.")
+def data_dir():
+    import os
 
-    else:
-        init_db(filepath)
-        click.echo(f"{filepath} created.")
+    base = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share"
+
+    return Path(base) / "tagumori"
+
+
+def vault_db_path(vault_id: str) -> Path:
+    if Path(vault_id).name != vault_id:
+        raise click.ClickException(f"Invalid vault id in pointer: {vault_id}")
+
+    return data_dir() / vault_id / "vault.db"
+
+
+def _ensure_uninitialized(pointer: Path) -> None:
+    # check pointer exists and is valid
+    existing = pointer.read_text().strip() if pointer.is_file() else ""
+    if not existing:
+        return
+
+    if vault_db_path(existing).exists():
+        raise click.ClickException(f"Already initialized (vault {existing}).")
+
+    raise click.ClickException(f"{pointer} names vault {existing}, but db not found.")
+
+
+def _new_db_dir() -> Path:
+    import secrets
+
+    root = data_dir()
+    root.mkdir(parents=True, exist_ok=True)
+    while True:
+        candidate = root / f"tagumori-{secrets.token_hex(3)}"
+        try:
+            candidate.mkdir()
+        except FileExistsError:
+            continue
+        return candidate
+
+
+@db.command(help="Initialize empty vault")
+@click.argument(
+    "directory", type=click.Path(path_type=Path, file_okay=False), default="."
+)
+def init(directory: Path):
+    # check if already exists
+    pointer = directory / ".tagumori/pointer"
+    _ensure_uninitialized(pointer)
+
+    db_dir = _new_db_dir()
+
+    try:
+        init_db(db_dir / "vault.db")
+        pointer.parent.mkdir(exist_ok=True)
+        pointer.write_text(db_dir.name)
+    except BaseException:  # in case literally anything crashes the process
+        shutil.rmtree(db_dir, ignore_errors=True)
 
 
 @db.command(help="Create a backup of vault.")
@@ -71,10 +121,10 @@ def info(lazy_vault: LazyVault):
 
         click.echo(f"SQLite version: {sqlite_version}")
         click.echo(f"Schema version: {user_version}")
-        click.echo(f"Path: {lazy_vault._path}")
-        click.echo(f"Size: {lazy_vault._path.stat().st_size / 1024:.1f} KB")
+        click.echo(f"Path: {lazy_vault.path}")
+        click.echo(f"Size: {lazy_vault.path.stat().st_size / 1024:.1f} KB")
         click.echo(
-            f"Modified: {datetime.fromtimestamp(lazy_vault._path.stat().st_mtime)}"
+            f"Modified: {datetime.fromtimestamp(lazy_vault.path.stat().st_mtime)}"
         )
         click.echo()
         click.echo("Tables:")

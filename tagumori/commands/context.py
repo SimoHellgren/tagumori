@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 from sqlite3 import Connection
 
@@ -10,23 +11,23 @@ from tagumori.vault import Vault
 class LazyVault:
     """Lazily gets vault only when it is truly accessed."""
 
-    def __init__(self, path: Path, ctx: click.Context):
-        self._path = path
+    def __init__(self, get_path: Callable[[], Path | None], ctx: click.Context):
+        self._get_path = get_path
         self._ctx = ctx
         self._conn: Connection | None = None
 
     @property
     def path(self) -> Path:
-        return self._path
+        return self._get_path()
 
     def _get_conn(self) -> Connection:
         if self._conn is None:
-            if not self._path.exists():
+            if self.path is None or not self.path.exists():
                 raise click.ClickException(
-                    f"{self._path} does not exist. Run `ftag db init {self._path}` to create"
+                    "Vault not found. Run `tagumori db init` to create"
                 )
 
-            self._conn = self._ctx.with_resource(get_connection(self._path))
+            self._conn = self._ctx.with_resource(get_connection(self.path))
 
         return self._conn
 
