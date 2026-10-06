@@ -7,6 +7,7 @@ import click
 
 from tagumori.commands.context import LazyVault
 from tagumori.db.init import init_db
+from tagumori.discovery import data_dir, pointer_path, read_pointer, vault_db_path
 
 
 @click.group(help="Database management")
@@ -15,24 +16,9 @@ def db(vault: LazyVault):
     pass
 
 
-def data_dir():
-    import os
-
-    base = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share"
-
-    return Path(base) / "tagumori"
-
-
-def vault_db_path(vault_id: str) -> Path:
-    if Path(vault_id).name != vault_id:
-        raise click.ClickException(f"Invalid vault id in pointer: {vault_id}")
-
-    return data_dir() / vault_id / "vault.db"
-
-
 def _ensure_uninitialized(pointer: Path) -> None:
     # check pointer exists and is valid
-    existing = pointer.read_text().strip() if pointer.is_file() else ""
+    existing = read_pointer(pointer)
     if not existing:
         return
 
@@ -62,7 +48,7 @@ def _new_db_dir() -> Path:
 )
 def init(directory: Path):
     # check if already exists
-    pointer = directory / ".tagumori/pointer"
+    pointer = pointer_path(directory)
     _ensure_uninitialized(pointer)
 
     pointer.parent.mkdir(parents=True, exist_ok=True)

@@ -13,19 +13,9 @@ from tagumori.commands.common import (
     tag_tree_callback,
 )
 from tagumori.commands.context import LazyVault
-from tagumori.commands.db import data_dir
+from tagumori.discovery import discover_vault
 from tagumori.query.ast import Expr
 from tagumori.render import format_file_output
-
-
-def discover_vault() -> Path | None:
-    cwd = Path().cwd()
-    for p in [cwd, *cwd.parents]:
-        candidate = p / ".tagumori/pointer"
-        if candidate.exists():
-            return Path(data_dir() / candidate.read_text() / "vault.db")
-
-    return None
 
 
 @click.group()
