@@ -11,6 +11,11 @@ from tagumori.models import Tag
 from tagumori.vault import Vault
 
 
+@pytest.fixture(autouse=True)
+def setup_data_dir(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+
+
 @pytest.fixture
 def conn() -> Generator[sqlite3.Connection]:
     conn = sqlite3.connect(":memory:")

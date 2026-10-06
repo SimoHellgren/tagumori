@@ -18,15 +18,15 @@ class LazyVault:
 
     @property
     def path(self) -> Path:
+        p = self._get_path()
+        if p is None or not p.exists():
+            raise click.ClickException(
+                "Vault not found. Run `tagumori db init` to create"
+            )
         return self._get_path()
 
     def _get_conn(self) -> Connection:
         if self._conn is None:
-            if self.path is None or not self.path.exists():
-                raise click.ClickException(
-                    "Vault not found. Run `tagumori db init` to create"
-                )
-
             self._conn = self._ctx.with_resource(get_connection(self.path))
 
         return self._conn
