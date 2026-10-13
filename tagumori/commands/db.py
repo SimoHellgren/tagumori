@@ -95,7 +95,7 @@ def backup(lazy_vault: LazyVault, dest: Path, directory: Path):
         backup_path.unlink()
 
     with lazy_vault as source:
-        snapshot(source.conn, backup_name)
+        snapshot(source.conn, backup_path)
 
     click.echo(f"Backup created: {backup_path}")
 
