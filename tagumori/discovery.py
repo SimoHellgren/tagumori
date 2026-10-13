@@ -1,4 +1,4 @@
-"""Holds functions / logic for discovering vaults."""
+"""Utilities for creating and discovering vaults."""
 
 import os
 from pathlib import Path
@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 
 POINTER = Path(".tagumori") / "pointer"
+DB_NAME = "vault.db"
 
 
 def data_dir() -> Path:
@@ -18,7 +19,7 @@ def vault_db_path(vault_id: str) -> Path:
     if Path(vault_id).name != vault_id:
         raise click.ClickException(f"Invalid vault id in pointer: {vault_id}")
 
-    return data_dir() / vault_id / "vault.db"
+    return data_dir() / vault_id / DB_NAME
 
 
 def new_db_dir() -> Path:

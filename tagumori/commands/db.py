@@ -9,7 +9,13 @@ from tagumori.commands.context import LazyVault
 from tagumori.db.backup import snapshot
 from tagumori.db.connect import open_readonly
 from tagumori.db.init import init_db, is_tagumori_db
-from tagumori.discovery import new_db_dir, pointer_path, read_pointer, vault_db_path
+from tagumori.discovery import (
+    DB_NAME,
+    new_db_dir,
+    pointer_path,
+    read_pointer,
+    vault_db_path,
+)
 
 
 @click.group(help="Database management")
@@ -55,10 +61,10 @@ def init(directory: Path, from_: Path | None) -> None:
     try:
         if from_:
             with closing(open_readonly(from_)) as source:
-                snapshot(source, db_dir / "vault.db")
+                snapshot(source, db_dir / DB_NAME)
 
         else:
-            init_db(db_dir / "vault.db")
+            init_db(db_dir / DB_NAME)
 
         pointer.write_text(db_dir.name)
     except BaseException:  # in case literally anything crashes the process
