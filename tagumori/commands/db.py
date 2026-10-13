@@ -9,6 +9,7 @@ from tagumori.commands.context import LazyVault
 from tagumori.db.backup import snapshot
 from tagumori.db.connect import open_readonly
 from tagumori.db.init import init_db, is_tagumori_db
+from tagumori.db.migrations import LATEST_VERSION
 from tagumori.discovery import (
     DB_NAME,
     new_db_dir,
@@ -58,10 +59,12 @@ def init(directory: Path, from_: Path | None) -> None:
     pointer.parent.mkdir(parents=True, exist_ok=True)
     db_dir = new_db_dir()
 
+    copied_version: int | None = None
     try:
         if from_:
             with closing(open_readonly(from_)) as source:
                 snapshot(source, db_dir / DB_NAME)
+                (copied_version,) = source.execute("PRAGMA user_version").fetchone()
 
         else:
             init_db(db_dir / DB_NAME)
@@ -70,6 +73,15 @@ def init(directory: Path, from_: Path | None) -> None:
     except BaseException:  # in case literally anything crashes the process
         shutil.rmtree(db_dir, ignore_errors=True)
         raise
+
+    click.echo(f"Initialized vault {db_dir.name} for {directory.resolve()}")
+    if from_:
+        click.echo(f"Copied from {from_}; the original was left untouched.")
+    if copied_version is not None and copied_version < LATEST_VERSION:
+        click.echo(
+            f"Schema is at version {copied_version} (latest is {LATEST_VERSION}); "
+            "run `tagumori db migrate` to update it."
+        )
 
 
 @db.command(help="Create a backup of vault.")
