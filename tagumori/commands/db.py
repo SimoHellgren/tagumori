@@ -89,7 +89,7 @@ def init(directory: Path, from_: Path | None) -> None:
 def backup(lazy_vault: LazyVault, dest: Path, directory: Path) -> None:
     if dest is None:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup_name = f"{lazy_vault.path.stem}-{timestamp}.db"
+        backup_name = f"{lazy_vault.path.parent.name}-{timestamp}.db"
 
     else:
         backup_name = dest
