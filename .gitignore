@@ -3,5 +3,6 @@ vault*.json
 *.pyo
 *.pyc
 *.egg-info
+.tagumori
 .coverage
 htmlcov/

@@ -1,11 +1,22 @@
-import sqlite3
+import shutil
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
 import click
 
 from tagumori.commands.context import LazyVault
-from tagumori.db.init import init_db
+from tagumori.db.backup import snapshot
+from tagumori.db.connect import open_readonly
+from tagumori.db.init import init_db, is_tagumori_db
+from tagumori.db.migrations import LATEST_VERSION
+from tagumori.discovery import (
+    DB_NAME,
+    new_db_dir,
+    pointer_path,
+    read_pointer,
+    vault_db_path,
+)
 
 
 @click.group(help="Database management")
@@ -14,15 +25,63 @@ def db(vault: LazyVault):
     pass
 
 
-@db.command(help="Initialize empty vault")
-@click.argument("filepath", type=click.Path(path_type=Path), default="vault.db")
-def init(filepath: Path):
-    if filepath.exists():
-        click.echo(f"{filepath} already exists.")
+def _ensure_uninitialized(pointer: Path) -> None:
+    # check pointer exists and is valid
+    existing = read_pointer(pointer)
+    if not existing:
+        return
 
-    else:
-        init_db(filepath)
-        click.echo(f"{filepath} created.")
+    if vault_db_path(existing).exists():
+        raise click.ClickException(f"Already initialized (vault {existing}).")
+
+    raise click.ClickException(f"{pointer} names vault {existing}, but db not found.")
+
+
+@db.command(help="Initialize empty vault")
+@click.argument(
+    "directory", type=click.Path(path_type=Path, file_okay=False), default="."
+)
+@click.option(
+    "--from",
+    "from_",
+    type=click.Path(path_type=Path, dir_okay=False, exists=True),
+    help="Copy contents from existing vault. Doesn't edit/move/delete existing file.",
+)
+def init(directory: Path, from_: Path | None) -> None:
+    # check if already exists
+    pointer = pointer_path(directory)
+    _ensure_uninitialized(pointer)
+
+    # validate before creating anything, so a bad source leaves nothing behind
+    if from_ and not is_tagumori_db(from_):
+        raise click.ClickException(f"{from_} is not a vault this version can use.")
+
+    pointer.parent.mkdir(parents=True, exist_ok=True)
+    db_dir = new_db_dir()
+
+    copied_version: int | None = None
+    try:
+        if from_:
+            with closing(open_readonly(from_)) as source:
+                snapshot(source, db_dir / DB_NAME)
+                (copied_version,) = source.execute("PRAGMA user_version").fetchone()
+
+        else:
+            init_db(db_dir / DB_NAME)
+
+        pointer.write_text(db_dir.name)
+    except BaseException:  # in case literally anything crashes the process
+        shutil.rmtree(db_dir, ignore_errors=True)
+        raise
+
+    click.echo(f"Initialized vault {db_dir.name} for {directory.resolve()}")
+    if from_:
+        click.echo(f"Copied from {from_}; the original was left untouched.")
+    if copied_version is not None and copied_version < LATEST_VERSION:
+        click.echo(
+            f"Schema is at version {copied_version} (latest is {LATEST_VERSION}); "
+            "run `tagumori db migrate` to update it."
+        )
 
 
 @db.command(help="Create a backup of vault.")
@@ -39,10 +98,10 @@ def init(filepath: Path):
     help="Directory to save backup into.",
 )
 @click.pass_obj
-def backup(lazy_vault: LazyVault, dest: Path, directory: Path):
+def backup(lazy_vault: LazyVault, dest: Path, directory: Path) -> None:
     if dest is None:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup_name = f"{lazy_vault._path.stem}-{timestamp}.db"
+        backup_name = f"{lazy_vault.path.parent.name}-{timestamp}.db"
 
     else:
         backup_name = dest
@@ -53,15 +112,15 @@ def backup(lazy_vault: LazyVault, dest: Path, directory: Path):
         click.confirm(f"{backup_path} already exists. Overwrite?", abort=True)
         backup_path.unlink()
 
-    with lazy_vault as source, sqlite3.connect(backup_path) as destination:
-        source.conn.backup(destination)
+    with lazy_vault as source:
+        snapshot(source.conn, backup_path)
 
     click.echo(f"Backup created: {backup_path}")
 
 
 @db.command(help="Database info")
 @click.pass_obj
-def info(lazy_vault: LazyVault):
+def info(lazy_vault: LazyVault) -> None:
     with lazy_vault as vault:
         sqlite_version = vault.conn.execute("SELECT sqlite_version()").fetchone()[0]
         user_version = vault.conn.execute("PRAGMA user_version").fetchone()[0]
@@ -71,10 +130,10 @@ def info(lazy_vault: LazyVault):
 
         click.echo(f"SQLite version: {sqlite_version}")
         click.echo(f"Schema version: {user_version}")
-        click.echo(f"Path: {lazy_vault._path}")
-        click.echo(f"Size: {lazy_vault._path.stat().st_size / 1024:.1f} KB")
+        click.echo(f"Path: {lazy_vault.path}")
+        click.echo(f"Size: {lazy_vault.path.stat().st_size / 1024:.1f} KB")
         click.echo(
-            f"Modified: {datetime.fromtimestamp(lazy_vault._path.stat().st_mtime)}"
+            f"Modified: {datetime.fromtimestamp(lazy_vault.path.stat().st_mtime)}"
         )
         click.echo()
         click.echo("Tables:")
@@ -88,7 +147,7 @@ def info(lazy_vault: LazyVault):
 
 @db.command(help="Migrate SQLite db to newest version")
 @click.pass_obj
-def migrate(lazy_vault: LazyVault):
+def migrate(lazy_vault: LazyVault) -> None:
     """Applies migrations on top of the schema.
     Will reassess if needed.
     """

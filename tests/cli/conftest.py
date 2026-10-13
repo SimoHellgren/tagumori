@@ -5,6 +5,7 @@ import pytest
 from click.testing import CliRunner, Result
 
 from tagumori.cli import cli
+from tagumori.db.init import init_db
 
 
 @pytest.fixture
@@ -16,8 +17,7 @@ def runner() -> CliRunner:
 def vault(tmp_path) -> Path:
     """Creates a temporary vault file and returns its path."""
     vault_path = tmp_path / "test_vault.db"
-    runner = CliRunner()
-    runner.invoke(cli, ["db", "init", str(vault_path)])
+    init_db(vault_path)
     return vault_path
 
 

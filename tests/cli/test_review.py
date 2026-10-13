@@ -13,7 +13,8 @@ from tagumori.commands.review import ReviewSession
 @pytest.fixture
 def lazy_vault(vault) -> LazyVault:
     """A LazyVault over the temporary vault file."""
-    return LazyVault(vault, click.Context(click.Command("test")))
+
+    return LazyVault(lambda: vault, click.Context(click.Command("test")))
 
 
 @pytest.fixture
