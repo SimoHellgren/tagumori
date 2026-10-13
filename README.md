@@ -8,7 +8,7 @@ Arbitrarily nestable tags for files, backed by SQLite.
 
 Best to install with `pipx`.
 
-Alternatively, yoy can `uv pip install -e .`
+Alternatively, you can `uv pip install -e .`
 
 
 ## Quick start
