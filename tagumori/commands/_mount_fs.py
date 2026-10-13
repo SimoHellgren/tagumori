@@ -1,10 +1,9 @@
 import errno
 import stat
-import sys
 import time
 from pathlib import Path
 
-from fuse import FUSE, FuseOSError, Operations
+from fuse import FuseOSError, Operations
 
 from tagumori.reads import (
     _files_by_name,
@@ -158,9 +157,7 @@ class TagumoriFS(Operations):
 
         (name,) = rest
         targets = files_for_query(self.vault, name)
-        return [
-            (Path(target).name, _link_attrs(now, target), 0) for target in targets
-        ]
+        return [(Path(target).name, _link_attrs(now, target), 0) for target in targets]
 
     def readlink(self, path: str) -> str:
         self.vault.check_cache()
@@ -180,11 +177,3 @@ class TagumoriFS(Operations):
             raise FuseOSError(errno.ENOENT)
 
         return target
-
-
-if __name__ == "__main__":
-    from tagumori.db.connect import get_connection
-
-    vault = Vault(get_connection(Path("vault.db")))
-    mountpoint = sys.argv[1]
-    FUSE(TagumoriFS(vault), mountpoint, foreground=True)
