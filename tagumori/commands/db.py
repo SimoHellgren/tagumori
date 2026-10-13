@@ -1,13 +1,15 @@
 import shutil
-import sqlite3
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
 import click
 
 from tagumori.commands.context import LazyVault
-from tagumori.db.init import init_db
-from tagumori.discovery import data_dir, pointer_path, read_pointer, vault_db_path
+from tagumori.db.backup import snapshot
+from tagumori.db.connect import open_readonly
+from tagumori.db.init import init_db, is_tagumori_db
+from tagumori.discovery import new_db_dir, pointer_path, read_pointer, vault_db_path
 
 
 @click.group(help="Database management")
@@ -28,34 +30,36 @@ def _ensure_uninitialized(pointer: Path) -> None:
     raise click.ClickException(f"{pointer} names vault {existing}, but db not found.")
 
 
-def _new_db_dir() -> Path:
-    import secrets
-
-    root = data_dir()
-    root.mkdir(parents=True, exist_ok=True)
-    while True:
-        candidate = root / f"tagumori-{secrets.token_hex(3)}"
-        try:
-            candidate.mkdir()
-        except FileExistsError:
-            continue
-        return candidate
-
-
 @db.command(help="Initialize empty vault")
 @click.argument(
     "directory", type=click.Path(path_type=Path, file_okay=False), default="."
 )
-def init(directory: Path):
+@click.option(
+    "--from",
+    "from_",
+    type=click.Path(path_type=Path, dir_okay=False, exists=True),
+    help="Copy contents from existing vault. Doesn't edit/move/delete existing file.",
+)
+def init(directory: Path, from_: Path | None):
     # check if already exists
     pointer = pointer_path(directory)
     _ensure_uninitialized(pointer)
 
+    # validate before creating anything, so a bad source leaves nothing behind
+    if from_ and not is_tagumori_db(from_):
+        raise click.ClickException(f"{from_} is not a vault this version can use.")
+
     pointer.parent.mkdir(parents=True, exist_ok=True)
-    db_dir = _new_db_dir()
+    db_dir = new_db_dir()
 
     try:
-        init_db(db_dir / "vault.db")
+        if from_:
+            with closing(open_readonly(from_)) as source:
+                snapshot(source, db_dir / "vault.db")
+
+        else:
+            init_db(db_dir / "vault.db")
+
         pointer.write_text(db_dir.name)
     except BaseException:  # in case literally anything crashes the process
         shutil.rmtree(db_dir, ignore_errors=True)
@@ -90,8 +94,8 @@ def backup(lazy_vault: LazyVault, dest: Path, directory: Path):
         click.confirm(f"{backup_path} already exists. Overwrite?", abort=True)
         backup_path.unlink()
 
-    with lazy_vault as source, sqlite3.connect(backup_path) as destination:
-        source.conn.backup(destination)
+    with lazy_vault as source:
+        snapshot(source.conn, backup_name)
 
     click.echo(f"Backup created: {backup_path}")
 

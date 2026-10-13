@@ -21,6 +21,24 @@ def vault_db_path(vault_id: str) -> Path:
     return data_dir() / vault_id / "vault.db"
 
 
+def new_db_dir() -> Path:
+    """Creates and returns an empty directory for a new vault's db.
+
+    The id is random; `mkdir` is the collision check, so it can't race.
+    """
+    import secrets
+
+    root = data_dir()
+    root.mkdir(parents=True, exist_ok=True)
+    while True:
+        candidate = root / f"tagumori-{secrets.token_hex(3)}"
+        try:
+            candidate.mkdir()
+        except FileExistsError:
+            continue
+        return candidate
+
+
 def pointer_path(directory: Path) -> Path:
     return directory / POINTER
 
