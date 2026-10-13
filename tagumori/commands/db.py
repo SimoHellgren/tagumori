@@ -40,7 +40,7 @@ def _ensure_uninitialized(pointer: Path) -> None:
     type=click.Path(path_type=Path, dir_okay=False, exists=True),
     help="Copy contents from existing vault. Doesn't edit/move/delete existing file.",
 )
-def init(directory: Path, from_: Path | None):
+def init(directory: Path, from_: Path | None) -> None:
     # check if already exists
     pointer = pointer_path(directory)
     _ensure_uninitialized(pointer)
@@ -80,7 +80,7 @@ def init(directory: Path, from_: Path | None):
     help="Directory to save backup into.",
 )
 @click.pass_obj
-def backup(lazy_vault: LazyVault, dest: Path, directory: Path):
+def backup(lazy_vault: LazyVault, dest: Path, directory: Path) -> None:
     if dest is None:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         backup_name = f"{lazy_vault.path.stem}-{timestamp}.db"
@@ -102,7 +102,7 @@ def backup(lazy_vault: LazyVault, dest: Path, directory: Path):
 
 @db.command(help="Database info")
 @click.pass_obj
-def info(lazy_vault: LazyVault):
+def info(lazy_vault: LazyVault) -> None:
     with lazy_vault as vault:
         sqlite_version = vault.conn.execute("SELECT sqlite_version()").fetchone()[0]
         user_version = vault.conn.execute("PRAGMA user_version").fetchone()[0]
@@ -129,7 +129,7 @@ def info(lazy_vault: LazyVault):
 
 @db.command(help="Migrate SQLite db to newest version")
 @click.pass_obj
-def migrate(lazy_vault: LazyVault):
+def migrate(lazy_vault: LazyVault) -> None:
     """Applies migrations on top of the schema.
     Will reassess if needed.
     """
